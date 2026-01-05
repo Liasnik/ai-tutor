@@ -1,0 +1,17 @@
+{
+  "name": "AI Tutor",
+  "short_name": "AI Tutor",
+  "description": "Your personalized AI Tutor with real-time voice interaction",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
