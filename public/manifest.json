@@ -1,6 +1,7 @@
 {
   "name": "AI Tutor",
   "short_name": "AI Tutor",
+  "id": "/",
   "description": "Your personalized AI Tutor with real-time voice interaction",
   "start_url": "/",
   "display": "standalone",
@@ -12,6 +13,16 @@
       "src": "/favicon.ico",
       "sizes": "any",
       "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }

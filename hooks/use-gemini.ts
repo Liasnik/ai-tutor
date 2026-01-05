@@ -3,6 +3,7 @@ import { useSettingsStore } from "@/store/settings";
 import { getSystemPrompt } from "@/lib/prompts";
 import { AudioPlayer } from "@/lib/audio-player";
 import { GoogleGenAI } from "@google/genai";
+import { createSession, saveMessage, getSessionMessages } from "@/lib/db";
 
 export function useGemini() {
   const { apiKey, selectedProfile, selectedLanguage, googleSearchEnabled } =
@@ -12,6 +13,7 @@ export function useGemini() {
   const [messages, setMessages] = useState<
     { id: string; text: string; isUser: boolean; isComplete?: boolean }[]
   >([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   const clientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
@@ -24,6 +26,40 @@ export function useGemini() {
       audioPlayerRef.current?.stop();
     };
   }, []);
+
+  // Helper to ensure session exists
+  const ensureSession = async () => {
+    if (!currentSessionId) {
+      const newId = Date.now().toString();
+      await createSession(newId, selectedProfile);
+      setCurrentSessionId(newId);
+      return newId;
+    }
+    return currentSessionId;
+  };
+
+  const loadSession = useCallback(async (sessionId: string) => {
+    const msgs = await getSessionMessages(sessionId);
+    // Map DB messages to UI messages
+    const uiMsgs = msgs.map((m) => ({
+      id: m.id,
+      text: m.text,
+      isUser: m.isUser,
+      isComplete: true, // Old messages are always complete
+    }));
+    setMessages(uiMsgs);
+    setCurrentSessionId(sessionId);
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    if (isConnected) {
+      // Keep connection but reset context?
+      // Gemini Live is stateful. Ideally we should reconnect or send a "reset" signal if supported,
+      // but simply clearing UI and IDs starts a "new" logical chat for storage.
+    }
+  }, [isConnected]);
 
   const disconnect = useCallback(async () => {
     if (sessionRef.current) {
@@ -148,6 +184,38 @@ export function useGemini() {
     disconnect,
   ]);
 
+  // Save messages to DB effect
+  const savedMessageIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // We only save completed AI messages or User messages
+    messages.forEach(async (msg) => {
+      if (
+        (msg.isUser || msg.isComplete) &&
+        !savedMessageIds.current.has(msg.id)
+      ) {
+        savedMessageIds.current.add(msg.id);
+
+        // Ensure session exists lazily
+        let sessionId = currentSessionId;
+        if (!sessionId) {
+          // Double check inside async
+          sessionId = await ensureSession();
+        }
+
+        if (sessionId) {
+          await saveMessage({
+            id: msg.id,
+            sessionId,
+            text: msg.text,
+            isUser: msg.isUser,
+            timestamp: Number(msg.id),
+          });
+        }
+      }
+    });
+  }, [messages, currentSessionId]);
+
   const sendAudio = useCallback(async (base64Data: string) => {
     if (!sessionRef.current) return;
     try {
@@ -164,10 +232,16 @@ export function useGemini() {
 
   const sendText = useCallback(async (text: string) => {
     if (!sessionRef.current) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now().toString(), text, isUser: true },
-    ]);
+
+    // Create new user message
+    const newMessage = {
+      id: Date.now().toString(),
+      text,
+      isUser: true,
+      isComplete: true,
+    };
+    setMessages((prev) => [...prev, newMessage]);
+
     try {
       await sessionRef.current.sendRealtimeInput({ text });
     } catch (e) {
@@ -183,5 +257,8 @@ export function useGemini() {
     disconnect,
     sendAudio,
     sendText,
+    currentSessionId,
+    loadSession,
+    startNewSession,
   };
 }
