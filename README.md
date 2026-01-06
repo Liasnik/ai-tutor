@@ -1,36 +1,185 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Tutor
 
-## Getting Started
+A personalized AI tutor with real-time voice interaction powered by Google Gemini Live API.
 
-First, run the development server:
+## 📋 Description
 
+AI Tutor is a web application for interactive learning using artificial intelligence. The app supports real-time voice communication, various learning modes, and conversation history storage.
+
+### Key Features
+
+- 🎤 **Voice Interaction** — communicate with AI through microphone in real-time
+- 🔊 **Audio Responses** — AI responds with voice and natural intonation
+- 📚 **Multiple Learning Profiles**:
+  - Interview preparation (Interview Tutor)
+  - English language tutor
+  - German language tutor
+  - Free conversation (various styles)
+- 💾 **Chat History** — local storage of all conversations
+- ⚙️ **Settings** — language selection, profile choice, custom instructions
+- 🔍 **Google Search Integration** — ability to search for up-to-date information
+- 📱 **PWA Support** — works as a native application
+- 📝 **Markdown Rendering** — beautiful display of AI responses
+
+## 🚀 Quick Start
+
+### Requirements
+
+- Node.js 18+
+- npm, yarn, pnpm, or bun
+- API key from Google AI Studio (Gemini API)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd ai-tutor
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+3. Run the development server:
 ```bash
 npm run dev
 # or
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+5. On first launch, enter your Google AI Studio API key in the settings
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠 Technologies
 
-## Learn More
+### Frontend Framework
+- **[Next.js 16.1.1](https://nextjs.org/)** — React framework with App Router
+- **[React 19.2.3](https://react.dev/)** — library for building UI
+- **[TypeScript 5](https://www.typescriptlang.org/)** — typed JavaScript
 
-To learn more about Next.js, take a look at the following resources:
+### AI & API
+- **[@google/genai 1.34.0](https://www.npmjs.com/package/@google/genai)** — official SDK for Google Gemini API
+- **Gemini Live API** — for real-time voice interaction
+- **Gemini 2.5 Flash** — model for audio and text processing
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### State Management
+- **[Zustand 5.0.9](https://zustand-demo.pmnd.rs/)** — lightweight state management library
+- **LocalStorage persistence** — user settings storage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Styling
+- **[Tailwind CSS 4](https://tailwindcss.com/)** — utility-first CSS framework
+- **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** — utility for merging classes
+- **[clsx](https://github.com/lukeed/clsx)** — conditional class merging
+- **[lucide-react](https://lucide.dev/)** — icon set
 
-## Deploy on Vercel
+### Data Management
+- **[idb 8.0.3](https://github.com/jakearchibald/idb)** — IndexedDB wrapper for chat history storage
+- **IndexedDB** — local browser database
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Content
+- **[react-markdown 10.1.0](https://github.com/remarkjs/react-markdown)** — Markdown rendering
+- **[remark-gfm 4.0.1](https://github.com/remarkjs/remark-gfm)** — GitHub Flavored Markdown support
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### PWA
+- **[@ducanh2912/next-pwa 10.2.9](https://github.com/DuCanhGH/next-pwa)** — PWA support for Next.js
+
+### Development
+- **[ESLint 9](https://eslint.org/)** — linter for JavaScript/TypeScript
+- **[eslint-config-next](https://nextjs.org/docs/app/building-your-application/configuring/eslint)** — ESLint configuration for Next.js
+
+## 📁 Project Structure
+
+```
+ai-tutor/
+├── app/                    # Next.js App Router
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Main page
+│   └── globals.css        # Global styles
+├── components/             # React components
+│   ├── ChatMessage.tsx    # Chat message component
+│   ├── ControlBar.tsx     # Control panel
+│   ├── SettingsDialog.tsx # Settings dialog
+│   ├── CustomInstructionsDialog.tsx # Custom instructions
+│   └── Sidebar.tsx        # Sidebar with history
+├── hooks/                  # Custom React hooks
+│   ├── useGemini.ts       # Hook for Gemini API
+│   └── useMicrophone.ts   # Hook for microphone
+├── lib/                    # Utilities and libraries
+│   ├── audioPlayer.ts     # Audio playback
+│   ├── db.ts              # IndexedDB operations
+│   ├── prompts.ts         # Prompts for various profiles
+│   └── utils.ts           # Helper functions
+├── store/                  # State management
+│   └── settings.ts         # Zustand store for settings
+├── types/                  # TypeScript types
+│   └── audio.d.ts         # Audio API types
+└── public/                 # Static files
+    └── manifest.json       # PWA manifest
+```
+
+## 🎯 Key Features
+
+### Voice Interaction
+- Real-time audio recording from microphone
+- Sending audio in PCM format (16kHz) to Gemini API
+- Playing audio responses from AI
+- Support for multiple languages (en-US, de-DE, es-ES, fr-FR, ru-RU)
+
+### Learning Profiles
+- **Interview Tutor** — technical interview preparation
+- **English Tutor** — English language learning
+- **German Tutor** — German language learning
+- **Conversation** — various free conversation styles
+
+### Chat History
+- Automatic saving of all conversations
+- Loading previous sessions
+- Deleting old chats
+- History search
+
+### Settings
+- Gemini API key
+- Learning profile selection
+- Interface and voice language selection
+- Google Search enable/disable
+- Custom instructions for AI
+
+## 🔧 Scripts
+
+```bash
+# Run in development mode
+npm run dev
+
+# Build for production
+npm run build
+
+# Run production version
+npm start
+
+# Run linter
+npm run lint
+```
+
+## 📝 License
+
+Private project
+
+## 🤝 Contributing
+
+The project is under active development. Suggestions and bug reports are welcome!
+
+## 📚 Additional Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Google Gemini API](https://ai.google.dev/)
+- [React Documentation](https://react.dev/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)

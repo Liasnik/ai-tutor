@@ -22,8 +22,13 @@ export function useMicrophone() {
 
         streamRef.current = stream;
 
-        const audioContext = new (window.AudioContext ||
-          (window as any).webkitAudioContext)({
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as WindowWithWebkit).webkitAudioContext;
+        if (!AudioContextClass) {
+          throw new Error("AudioContext is not supported in this browser");
+        }
+        const audioContext = new AudioContextClass({
           sampleRate: 16000,
         });
         audioContextRef.current = audioContext;

@@ -1,14 +1,22 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useGemini } from "@/hooks/use-gemini";
-import { useMicrophone } from "@/hooks/use-microphone";
-import { ControlBar } from "@/components/control-bar";
-import { SettingsDialog } from "@/components/settings-dialog";
-import { ChatMessage } from "@/components/chat-message";
-import { HistorySidebar } from "@/components/history-sidebar";
+import { useGemini } from "@/hooks/useGemini";
+import { useMicrophone } from "@/hooks/useMicrophone";
+import { ControlBar } from "@/components/ControlBar";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { CustomInstructionsDialog } from "@/components/CustomInstructionsDialog";
+import { ChatMessage } from "@/components/ChatMessage";
+import { Sidebar } from "@/components/Sidebar";
 import { useSettingsStore } from "@/store/settings";
 import { Menu } from "lucide-react";
+
+interface Message {
+  id: string;
+  text: string;
+  isUser: boolean;
+  isComplete?: boolean;
+}
 
 export default function Home() {
   const {
@@ -27,20 +35,28 @@ export default function Home() {
   // We pass sendAudio to useMicrophone directly, but need to handle valid session
   const { isRecording, startRecording, stopRecording } = useMicrophone();
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { apiKey } = useSettingsStore();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(() => !apiKey);
+  const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] =
+    useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { apiKey } = useSettingsStore();
+  const hasAutoOpenedRef = useRef(false);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Update settings dialog state when API key changes
   useEffect(() => {
-    // Open settings automatically if no API key
-    if (!apiKey) {
-      setIsSettingsOpen(true);
+    if (!apiKey && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      setTimeout(() => {
+        setIsSettingsOpen(true);
+      }, 0);
+    } else if (apiKey) {
+      hasAutoOpenedRef.current = false;
     }
   }, [apiKey]);
 
@@ -70,19 +86,21 @@ export default function Home() {
     <main className="flex h-screen bg-black text-white font-sans overflow-hidden">
       {/* Desktop Sidebar (hidden on mobile, visible on lg) */}
       <div className="hidden lg:block h-full">
-        <HistorySidebar
+        <Sidebar
           currentSessionId={currentSessionId}
           onSelectSession={loadSession}
           onNewChat={startNewSession}
+          onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
           isOpen={true}
         />
       </div>
 
       {/* Mobile Sidebar (Drawer) */}
-      <HistorySidebar
+      <Sidebar
         currentSessionId={currentSessionId}
         onSelectSession={loadSession}
         onNewChat={startNewSession}
+        onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isMobile={true}
@@ -111,7 +129,7 @@ export default function Home() {
               </div>
             )}
 
-            {messages.map((msg: any) => (
+            {messages.map((msg: Message) => (
               <ChatMessage key={msg.id} text={msg.text} isUser={msg.isUser} />
             ))}
 
@@ -134,6 +152,12 @@ export default function Home() {
         <SettingsDialog
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+        />
+
+        {/* Custom Instructions Modal */}
+        <CustomInstructionsDialog
+          isOpen={isCustomInstructionsOpen}
+          onClose={() => setIsCustomInstructionsOpen(false)}
         />
       </div>
     </main>

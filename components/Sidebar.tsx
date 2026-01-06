@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSessions, deleteSession } from "@/lib/db";
-import { MessageSquare, Trash2, Plus, Menu, X } from "lucide-react";
+import { MessageSquare, Trash2, Plus, X, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Session {
@@ -16,30 +16,35 @@ interface HistorySidebarProps {
   currentSessionId: string | null;
   onSelectSession: (sessionId: string) => void;
   onNewChat: () => void;
+  onCustomInstructionsClick: () => void;
   isOpen?: boolean;
   onClose?: () => void; // For mobile
   isMobile?: boolean;
 }
 
-export function HistorySidebar({
+export function Sidebar({
   currentSessionId,
   onSelectSession,
   onNewChat,
+  onCustomInstructionsClick,
   isOpen = true,
   onClose,
   isMobile = false,
 }: HistorySidebarProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  useEffect(() => {
-    loadSessions();
-  }, [isOpen, currentSessionId]); // Reload when opened or session changes
-
+  
   const loadSessions = async () => {
     const list = await getSessions();
     // Sort by newest first
     setSessions(list.reverse());
   };
+  
+  useEffect(() => {
+    (async () => {
+      await loadSessions();
+    })();
+  }, [isOpen, currentSessionId]); // Reload when opened or session changes
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -52,7 +57,7 @@ export function HistorySidebar({
     }
   };
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800 w-64">
       <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
         <h2 className="font-semibold text-zinc-100">Chat History</h2>
@@ -100,7 +105,7 @@ export function HistorySidebar({
             )}
           >
             <div className="flex items-center space-x-3 overflow-hidden">
-              <MessageSquare className="w-4 h-4 flex-shrink-0" />
+              <MessageSquare className="w-4 h-4 shrink-0" />
               <div className="flex flex-col truncate">
                 <span className="truncate text-sm font-medium">
                   {session.title}
@@ -120,6 +125,20 @@ export function HistorySidebar({
           </div>
         ))}
       </div>
+
+      {/* Custom AI Instructions button at bottom */}
+      <div className="p-4 border-t border-zinc-800">
+        <button
+          onClick={() => {
+            onCustomInstructionsClick();
+            if (isMobile && onClose) onClose();
+          }}
+          className="w-full flex items-center justify-center space-x-2 text-zinc-400 hover:text-white hover:bg-zinc-800 py-2 px-4 rounded-lg transition-colors"
+        >
+          <Settings2 className="w-4 h-4" />
+          <span>Custom AI Instructions</span>
+        </button>
+      </div>
     </div>
   );
 
@@ -135,7 +154,7 @@ export function HistorySidebar({
             />
             {/* Drawer */}
             <div className="relative z-50 animate-in slide-in-from-left duration-300">
-              <SidebarContent />
+              {sidebarContent}
             </div>
           </div>
         )}
@@ -143,5 +162,5 @@ export function HistorySidebar({
     );
   }
 
-  return isOpen ? <SidebarContent /> : null;
+  return isOpen ? sidebarContent : null;
 }

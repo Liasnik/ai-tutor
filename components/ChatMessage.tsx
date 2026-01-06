@@ -2,6 +2,13 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ReactNode, HTMLAttributes } from "react";
+
+interface CodeProps extends HTMLAttributes<HTMLElement> {
+  node?: unknown;
+  inline?: boolean;
+  children?: ReactNode;
+}
 
 export function ChatMessage({
   text,
@@ -15,7 +22,7 @@ export function ChatMessage({
       className={`flex w-full mb-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`max-w-[85%] rounded-2xl px-5 py-3 shadow-sm prose prose-invert prose-sm max-w-none break-words ${
+        className={`max-w-[85%] rounded-2xl px-5 py-3 shadow-sm prose prose-invert prose-sm max-w-none wrap-break-word ${
           isUser
             ? "bg-blue-600 text-white rounded-br-none"
             : "bg-zinc-800/80 text-zinc-100 rounded-bl-none border border-zinc-700/50 backdrop-blur-sm"
@@ -36,7 +43,7 @@ export function ChatMessage({
             strong: ({ node, ...props }) => (
               <strong className="font-bold text-white" {...props} />
             ),
-            code: ({ node, inline, className, children, ...props }: any) => {
+            code: ({ node, inline, className, children, ...props }: CodeProps) => {
               return inline ? (
                 <code
                   className="bg-black/30 px-1 py-0.5 rounded text-sm font-mono"

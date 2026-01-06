@@ -10,8 +10,6 @@ export function SettingsDialog({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  if (!isOpen) return null;
-
   const {
     apiKey,
     setApiKey,
@@ -22,6 +20,8 @@ export function SettingsDialog({
     googleSearchEnabled,
     setGoogleSearchEnabled,
   } = useSettingsStore();
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -62,12 +62,27 @@ export function SettingsDialog({
               value={selectedProfile}
               onChange={(e) => setProfile(e.target.value)}
             >
-              <option value="interview">Interview Helper</option>
+              <option value="conversation">Free Conversation</option>
+              <option value="interview">Interview Tutor</option>
               <option value="english_tutor">English Tutor</option>
               <option value="german_tutor">German Tutor</option>
-              <option value="sales">Sales Assistant</option>
-              <option value="meeting">Meeting Assistant</option>
-              <option value="exam">Exam Helper</option>
+              <option value="conversation_friendly">
+                Conversation Friendly
+              </option>
+              <option value="conversation_formal">Conversation Formal</option>
+              <option value="conversation_supportive">
+                Conversation Supportive
+              </option>
+              <option value="conversation_humor">Conversation Humor</option>
+              <option value="conversation_philosophical">
+                Conversation Philosophical
+              </option>
+              <option value="conversation_assertive_debater">
+                Conversation Assertive Debater
+              </option>
+              <option value="conversation_strict_mentor">
+                Conversation Strict Mentor
+              </option>
             </select>
           </div>
 

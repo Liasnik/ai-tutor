@@ -14,7 +14,11 @@ export class AudioPlayer {
   public async initialize() {
     if (!this.audioContext) {
       const AudioContextClass =
-        window.AudioContext || (window as any).webkitAudioContext;
+        window.AudioContext ||
+        (window as WindowWithWebkit).webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error("AudioContext is not supported in this browser");
+      }
       this.audioContext = new AudioContextClass({
         sampleRate: this.sampleRate,
       });

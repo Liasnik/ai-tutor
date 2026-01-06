@@ -1,13 +1,45 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSettingsStore } from "@/store/settings";
 import { getSystemPrompt } from "@/lib/prompts";
-import { AudioPlayer } from "@/lib/audio-player";
+import { AudioPlayer } from "@/lib/audioPlayer";
 import { GoogleGenAI } from "@google/genai";
 import { createSession, saveMessage, getSessionMessages } from "@/lib/db";
 
+// Types for Gemini Live API
+// Infer session type from the connect method return value
+type GeminiSession = Awaited<ReturnType<GoogleGenAI["live"]["connect"]>>;
+
+// Message type - using the actual type from library's callbacks
+// The library uses LiveServerMessage internally
+interface GeminiServerContent {
+  modelTurn?: {
+    parts?: Array<{
+      inlineData?: {
+        data: string;
+        mimeType?: string;
+      };
+    }>;
+  };
+  outputTranscription?: {
+    text: string;
+  };
+  turnComplete?: boolean;
+}
+
+interface GeminiMessage {
+  serverContent?: GeminiServerContent;
+}
+
+type GeminiError = { message: string } | Error;
+
 export function useGemini() {
-  const { apiKey, selectedProfile, selectedLanguage, googleSearchEnabled } =
-    useSettingsStore();
+  const {
+    apiKey,
+    selectedProfile,
+    selectedLanguage,
+    googleSearchEnabled,
+    customInstructions,
+  } = useSettingsStore();
   const [status, setStatus] = useState("Disconnected");
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<
@@ -16,7 +48,7 @@ export function useGemini() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   const clientRef = useRef<GoogleGenAI | null>(null);
-  const sessionRef = useRef<any>(null);
+  const sessionRef = useRef<GeminiSession | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
 
   // Initialize AudioPlayer
@@ -28,7 +60,7 @@ export function useGemini() {
   }, []);
 
   // Helper to ensure session exists
-  const ensureSession = async () => {
+  const ensureSession = useCallback(async () => {
     if (!currentSessionId) {
       const newId = Date.now().toString();
       await createSession(newId, selectedProfile);
@@ -36,7 +68,7 @@ export function useGemini() {
       return newId;
     }
     return currentSessionId;
-  };
+  }, [currentSessionId, selectedProfile]);
 
   const loadSession = useCallback(async (sessionId: string) => {
     const msgs = await getSessionMessages(sessionId);
@@ -64,7 +96,7 @@ export function useGemini() {
   const disconnect = useCallback(async () => {
     if (sessionRef.current) {
       try {
-        await sessionRef.current.close();
+        sessionRef.current.close();
       } catch (e) {
         console.error("Error closing session", e);
       }
@@ -91,7 +123,7 @@ export function useGemini() {
 
       const systemPrompt = getSystemPrompt(
         selectedProfile,
-        "",
+        customInstructions,
         googleSearchEnabled
       );
 
@@ -104,10 +136,11 @@ export function useGemini() {
             setIsConnected(true);
             setMessages([]);
           },
-          onmessage: (message: any) => {
+          onmessage: ((message: unknown) => {
+            const msg = message as GeminiMessage;
             // Handle Audio Output
-            if (message.serverContent?.modelTurn?.parts) {
-              for (const part of message.serverContent.modelTurn.parts) {
+            if (msg.serverContent?.modelTurn?.parts) {
+              for (const part of msg.serverContent.modelTurn.parts) {
                 if (
                   part.inlineData &&
                   part.inlineData.mimeType?.startsWith("audio/")
@@ -118,8 +151,8 @@ export function useGemini() {
             }
 
             // Handle Output Transcription (The actual spoken text, filtering out thoughts)
-            if (message.serverContent?.outputTranscription?.text) {
-              const text = message.serverContent.outputTranscription.text;
+            if (msg.serverContent?.outputTranscription?.text) {
+              const text = msg.serverContent.outputTranscription.text;
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 // If previous message exists, is from AI, and is NOT complete -> append
@@ -138,7 +171,7 @@ export function useGemini() {
             }
 
             // Handle Turn Complete
-            if (message.serverContent?.turnComplete) {
+            if (msg.serverContent?.turnComplete) {
               setStatus("Listening...");
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
@@ -148,22 +181,24 @@ export function useGemini() {
                 return prev;
               });
             }
-          },
-          onclose: (e: any) => {
+          }) as (message: unknown) => void,
+          onclose: (e: CloseEvent | Event) => {
             console.log("Session closed", e);
             setStatus("Disconnected");
             setIsConnected(false);
           },
-          onerror: (e: any) => {
+          onerror: (e: GeminiError | Error) => {
             console.error("Session error", e);
             setStatus("Error: " + e.message);
           },
         },
         config: {
-          responseModalities: ["AUDIO" as any], // Type assertion for Modality enum
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          responseModalities: ["AUDIO"] as any,
           outputAudioTranscription: {}, // Enable text output
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+            languageCode: selectedLanguage,
           },
           systemInstruction: { parts: [{ text: systemPrompt }] },
           tools: googleSearchEnabled ? [{ googleSearch: {} }] : [],
@@ -171,9 +206,11 @@ export function useGemini() {
       });
 
       sessionRef.current = session;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Connection failed:", error);
-      setStatus("Error: " + error.message);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      setStatus("Error: " + errorMessage);
       setIsConnected(false);
     }
   }, [
@@ -181,6 +218,7 @@ export function useGemini() {
     selectedProfile,
     selectedLanguage,
     googleSearchEnabled,
+    customInstructions,
     disconnect,
   ]);
 
@@ -214,7 +252,7 @@ export function useGemini() {
         }
       }
     });
-  }, [messages, currentSessionId]);
+  }, [messages, currentSessionId, ensureSession]);
 
   const sendAudio = useCallback(async (base64Data: string) => {
     if (!sessionRef.current) return;
