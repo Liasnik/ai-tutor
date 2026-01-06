@@ -62,10 +62,12 @@ export function SettingsDialog({
               value={selectedProfile}
               onChange={(e) => setProfile(e.target.value)}
             >
-              <option value="conversation">Free Conversation</option>
-              <option value="interview">Interview Tutor</option>
+              <option value="conversation">Conversation</option>
+              <option value="interview_universal">Interview Tutor</option>
+              <option value="interview_frontend">Frontend Interview Tutor</option>
               <option value="english_tutor">English Tutor</option>
               <option value="german_tutor">German Tutor</option>
+              <option value="estonian_tutor">Estonian Tutor</option>
               <option value="conversation_friendly">
                 Conversation Friendly
               </option>
