@@ -37,6 +37,7 @@ export function useGemini() {
     apiKey,
     selectedProfile,
     selectedLanguage,
+    selectedVoice,
     googleSearchEnabled,
     customInstructions,
   } = useSettingsStore();
@@ -197,7 +198,11 @@ export function useGemini() {
           responseModalities: ["AUDIO"] as any,
           outputAudioTranscription: {}, // Enable text output
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+            voiceConfig: { 
+              prebuiltVoiceConfig: { 
+                voiceName: selectedVoice
+               } 
+              },
             languageCode: selectedLanguage,
           },
           systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -217,6 +222,7 @@ export function useGemini() {
     apiKey,
     selectedProfile,
     selectedLanguage,
+    selectedVoice,
     googleSearchEnabled,
     customInstructions,
     disconnect,
