@@ -5,6 +5,7 @@ interface SettingsState {
   apiKey: string;
   selectedProfile: string;
   selectedLanguage: string;
+  selectedVoice: string;
   selectedMicrophoneId: string;
   selectedSpeakerId: string;
   isOnboardingCompleted: boolean;
@@ -15,6 +16,7 @@ interface SettingsState {
   setApiKey: (key: string) => void;
   setProfile: (profile: string) => void;
   setLanguage: (language: string) => void;
+  setVoice: (voice: string) => void;
   setMicrophoneId: (id: string) => void;
   setSpeakerId: (id: string) => void;
   setGoogleSearchEnabled: (enabled: boolean) => void;
@@ -28,6 +30,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiKey: "",
       selectedProfile: "conversation",
       selectedLanguage: "en-US",
+      selectedVoice: "Charon", // Default voice
       selectedMicrophoneId: "default",
       selectedSpeakerId: "default",
       isOnboardingCompleted: false,
@@ -37,6 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
       setApiKey: (apiKey) => set({ apiKey }),
       setProfile: (selectedProfile) => set({ selectedProfile }),
       setLanguage: (selectedLanguage) => set({ selectedLanguage }),
+      setVoice: (selectedVoice) => set({ selectedVoice }),
       setMicrophoneId: (selectedMicrophoneId) => set({ selectedMicrophoneId }),
       setSpeakerId: (selectedSpeakerId) => set({ selectedSpeakerId }),
       setGoogleSearchEnabled: (googleSearchEnabled) =>

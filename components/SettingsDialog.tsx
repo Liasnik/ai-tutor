@@ -17,6 +17,8 @@ export function SettingsDialog({
     setProfile,
     selectedLanguage,
     setLanguage,
+    selectedVoice, 
+    setVoice,      
     googleSearchEnabled,
     setGoogleSearchEnabled,
   } = useSettingsStore();
@@ -85,6 +87,23 @@ export function SettingsDialog({
               <option value="conversation_strict_mentor">
                 Conversation Strict Mentor
               </option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-1.5">
+              AI Voice
+            </label>
+            <select
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 rounded-md p-2.5 text-white outline-none transition-all"
+              value={selectedVoice}
+              onChange={(e) => setVoice(e.target.value)}
+            >
+              <option value="Aoede">Aoede (Female - Soft)</option>
+              <option value="Kore">Kore (Female - Professional)</option>
+              <option value="Puck">Puck (Male - Energetic)</option>
+              <option value="Charon">Charon (Male - Deep)</option>
+              <option value="Fenrir">Fenrir (Male - Strong)</option>
             </select>
           </div>
 
