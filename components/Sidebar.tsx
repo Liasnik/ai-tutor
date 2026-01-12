@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSessions, deleteSession } from "@/lib/db";
 import { MessageSquare, Trash2, Plus, X, Settings, Settings2 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 interface Session {
@@ -60,13 +61,12 @@ export function Sidebar({
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800 w-64">
-      <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-        <h2 className="font-semibold text-zinc-100">Chat History</h2>
+    <div className="flex flex-col lg:pt-4 h-full w-64 bg-color-sidebar border-r-color-sidebar sidebar-solid">
+      <div className="lg:hidden p-4 py-2 border-b border-zinc-800 flex items-center justify-end">
         {isMobile && onClose && (
           <button
             onClick={onClose}
-            className="p-2 hover:bg-zinc-800 rounded-md text-zinc-400"
+            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-900 rounded-full text-zinc-400 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -79,7 +79,7 @@ export function Sidebar({
             onNewChat();
             if (isMobile && onClose) onClose();
           }}
-          className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center space-x-2 user-message hover:scale-105 transition-transform text-white py-2 px-4 rounded-lg cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Chat</span>
@@ -102,8 +102,8 @@ export function Sidebar({
             className={cn(
               "group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all",
               currentSessionId === session.id
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                ? "bg-slate-200 dark:bg-slate-800 dark:text-white"
+                : "text-zinc-500 dark:text-zinc-500 hover:bg-[rgba(0,0,0,0.06)] dark:hover:bg-slate-900 dark:hover:text-zinc-200"
             )}
           >
             <div className="flex items-center space-x-3 overflow-hidden">
@@ -119,7 +119,7 @@ export function Sidebar({
             </div>
             <button
               onClick={(e) => handleDelete(e, session.id)}
-              className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/30 text-zinc-500 hover:text-red-400 rounded transition-all"
+              className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-300/80 text-zinc-500 hover:text-red-500 rounded-full transition-all"
               title="Delete chat"
             >
               <Trash2 className="w-3 h-3" />
@@ -129,27 +129,32 @@ export function Sidebar({
       </div>
 
       {/* Custom AI Instructions button at bottom */}
-      <div className="p-4 border-t border-zinc-800">
-        <button
-          onClick={() => {
-            onOpenSettings();
-            if (isMobile && onClose) onClose();
-          }}
-          className="w-full flex items-center justify-start space-x-2 text-zinc-400 hover:text-white hover:bg-zinc-800 py-2 px-4 rounded-lg transition-colors"
-        >
-          <Settings className="w-4 h-4" />
-          <span>Settings</span>
-        </button>
+      <div className="flex flex-col p-4 border-t gap-2 border-t-color-sidebar">
+      
+        
         <button
           onClick={() => {
             onCustomInstructionsClick();
             if (isMobile && onClose) onClose();
           }}
-          className="w-full flex items-center justify-center space-x-2 text-zinc-400 hover:text-white hover:bg-zinc-800 py-2 px-4 rounded-lg transition-colors"
+          className="w-full flex items-center justify-start space-x-2 py-2 px-3 rounded-lg transition-colors text-color-sidebar-foreground hover:text-white hover:bg-[rgba(0,0,0,0.06)] dark:hover:bg-slate-900 cursor-pointer"
         >
           <Settings2 className="w-4 h-4" />
           <span>Custom AI Instructions</span>
         </button>
+        <button
+          onClick={() => {
+            onOpenSettings();
+            if (isMobile && onClose) onClose();
+          }}
+          className="w-full flex items-center justify-start space-x-2 py-2 px-3 rounded-lg transition-colors text-color-sidebar-foreground hover:bg-[rgba(0,0,0,0.06)] dark:hover:bg-slate-900 cursor-pointer"
+          // className="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-lg transition-colors always-primary-bg always-primary-text always-primary-hover"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Settings</span>
+        </button>
+          {/* Theme toggle */}
+          <ThemeToggle />
       </div>
     </div>
   );

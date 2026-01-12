@@ -11,6 +11,7 @@ interface SettingsState {
   isOnboardingCompleted: boolean;
   googleSearchEnabled: boolean;
   customInstructions: string;
+  theme: "dark" | "light";
 
   // Actions
   setApiKey: (key: string) => void;
@@ -21,6 +22,8 @@ interface SettingsState {
   setSpeakerId: (id: string) => void;
   setGoogleSearchEnabled: (enabled: boolean) => void;
   setCustomInstructions: (instructions: string) => void;
+  setTheme: (theme: "dark" | "light") => void;
+  toggleTheme: () => void;
   completeOnboarding: () => void;
 }
 
@@ -36,6 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
       isOnboardingCompleted: false,
       googleSearchEnabled: true,
       customInstructions: "",
+      theme: "dark",
 
       setApiKey: (apiKey) => set({ apiKey }),
       setProfile: (selectedProfile) => set({ selectedProfile }),
@@ -47,6 +51,9 @@ export const useSettingsStore = create<SettingsState>()(
         set({ googleSearchEnabled }),
       setCustomInstructions: (customInstructions) =>
         set({ customInstructions }),
+      setTheme: (theme) => set({ theme }),
+      toggleTheme: () =>
+        set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),
       completeOnboarding: () => set({ isOnboardingCompleted: true }),
     }),
     {

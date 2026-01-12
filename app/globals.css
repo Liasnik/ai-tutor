@@ -16,6 +16,7 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -66,18 +67,19 @@
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
   --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-1: oklch(64.809% 0.21657 37.059 / 0.858);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar-hover: oklch(75.506% 0.05605 267.738);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.968 0.007 247.896);
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-border: oklch(89.835% 0.01282 255.641);
   --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
@@ -100,12 +102,13 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-1: oklch(62.3% 0.214 259.815);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-hover: oklch(0.208 0.042 265.755);
+  --sidebar: oklch(17.267% 0.03917 266.134);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
@@ -120,13 +123,54 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial;
   }
 }
 
-/* Utility: hide elements on viewports narrower than 360px */
 @media (max-width: 361px) {
   .hide-below-360 {
     display: none !important;
   }
 }
+
+/* Theme helper utilities mapped to CSS variables */
+.bg-color-sidebar { background-color: var(--color-sidebar) !important; }
+.hover\:bg-color-sidebar-hover:hover { background-color: var(--color-sidebar-hover) !important; }
+.border-color-sidebar { border-color: var(--color-sidebar-border) !important; }
+.border-r-color-sidebar { border-right: 1px solid var(--color-sidebar-border) !important; }
+.border-t-color-sidebar { border-top-color: var(--color-sidebar-border) !important; }
+.text-color-sidebar-foreground { color: var(--color-sidebar-foreground) !important; }
+
+.bg-primary { background-color: var(--primary) !important; }
+.text-primary-foreground { color: var(--primary-foreground) !important; }
+.bg-destructive { background-color: var(--destructive) !important; }
+.text-destructive { color: var(--destructive) !important; }
+
+.bg-card { background-color: var(--card) !important; }
+.text-card-foreground { color: var(--card-foreground) !important; }
+.border-color-border { border-color: var(--color-border) !important; }
+
+.status-connected { background-color: rgba(16,185,129,0.08) !important; border-color: rgba(16,185,129,0.2) !important; color: var(--foreground) !important; }
+.status-disconnected { background-color: var(--color-sidebar) !important; border-color: var(--color-sidebar-border) !important; color: var(--muted-foreground) !important; }
+
+/* Force a solid, non-transparent sidebar background (remove backdrop blur) */
+.sidebar-solid {
+  background-color: var(--color-sidebar) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Always-blue utilities (fixed Tailwind blue-600 look) */
+.always-primary-bg { background-color: #2563EB !important; }
+.always-primary-hover:hover { background-color: #1E40AF !important; }
+.always-primary-text { color: #FFFFFF !important; }
+
+/* Ensure user messages stay blue with white text */
+.user-message { background-color: var(--color-chart-1) !important; color: #FFFFFF !important; }
+.user-message-blue a { color: rgba(255,255,255,0.9) !important; }
+
+
