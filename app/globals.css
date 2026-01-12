@@ -123,3 +123,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Utility: hide elements on viewports narrower than 360px */
+@media (max-width: 361px) {
+  .hide-below-360 {
+    display: none !important;
+  }
+}

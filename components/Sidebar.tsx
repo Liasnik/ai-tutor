@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSessions, deleteSession } from "@/lib/db";
-import { MessageSquare, Trash2, Plus, X, Settings2 } from "lucide-react";
+import { MessageSquare, Trash2, Plus, X, Settings, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Session {
@@ -16,6 +16,7 @@ interface HistorySidebarProps {
   currentSessionId: string | null;
   onSelectSession: (sessionId: string) => void;
   onNewChat: () => void;
+  onOpenSettings: () => void;
   onCustomInstructionsClick: () => void;
   isOpen?: boolean;
   onClose?: () => void; // For mobile
@@ -26,6 +27,7 @@ export function Sidebar({
   currentSessionId,
   onSelectSession,
   onNewChat,
+  onOpenSettings,
   onCustomInstructionsClick,
   isOpen = true,
   onClose,
@@ -128,6 +130,16 @@ export function Sidebar({
 
       {/* Custom AI Instructions button at bottom */}
       <div className="p-4 border-t border-zinc-800">
+        <button
+          onClick={() => {
+            onOpenSettings();
+            if (isMobile && onClose) onClose();
+          }}
+          className="w-full flex items-center justify-start space-x-2 text-zinc-400 hover:text-white hover:bg-zinc-800 py-2 px-4 rounded-lg transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Settings</span>
+        </button>
         <button
           onClick={() => {
             onCustomInstructionsClick();
