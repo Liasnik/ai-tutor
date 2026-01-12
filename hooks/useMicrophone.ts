@@ -2,12 +2,14 @@ import { useState, useRef, useCallback } from "react";
 
 export function useMicrophone() {
   const [isRecording, setIsRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const startRecording = useCallback(
     async (deviceId: string, onAudioData: (base64: string) => void) => {
+      setError(null);
       try {
         if (!navigator.mediaDevices) {
           throw new Error(
@@ -74,7 +76,9 @@ export function useMicrophone() {
 
         setIsRecording(true);
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         console.error("Error starting microphone:", err);
+        setError(msg);
         setIsRecording(false);
       }
     },
@@ -100,5 +104,5 @@ export function useMicrophone() {
     }
   }, []);
 
-  return { isRecording, startRecording, stopRecording };
+  return { isRecording, error, startRecording, stopRecording };
 }
