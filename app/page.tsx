@@ -42,11 +42,22 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasAutoOpenedRef = useRef(false);
+  const pendingSendRef = useRef<string | null>(null);
+  const [inputText, setInputText] = useState("");
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // If we queued a text to send while disconnected, send it once connected
+  useEffect(() => {
+    if (isConnected && pendingSendRef.current) {
+      sendText(pendingSendRef.current);
+      pendingSendRef.current = null;
+      setTimeout(() => setInputText(""), 0);
+    }
+  }, [isConnected, sendText]);
 
   // Update settings dialog state when API key changes
   useEffect(() => {
@@ -65,11 +76,21 @@ export default function Home() {
       stopRecording();
     } else {
       // Note: In real production, we'd handle deviceId selection
-      startRecording("default", (base64) => {
-        if (isConnected) {
-          sendAudio(base64);
+      //  startRecording("default", (base64) => {
+      //   if (isConnected) {
+      //     sendAudio(base64);
+      //   }
+      // If not connected, connect first so audio will be sent
+      (async () => {
+        if (!isConnected) {
+          await connect();
         }
-      });
+        startRecording("default", (base64) => {
+          if (isConnected) {
+            sendAudio(base64);
+          }
+        });
+      })();
     }
   };
 
@@ -80,6 +101,20 @@ export default function Home() {
   const handleDisconnect = () => {
     stopRecording();
     disconnect();
+  };
+
+  const handleSendText = () => {
+    const text = inputText.trim();
+    if (!text) return;
+
+    if (isConnected) {
+      sendText(text);
+      setInputText("");
+    } else {
+      // Queue the text to be sent once connection is established
+      pendingSendRef.current = text;
+      connect();
+    }
   };
 
   return (
@@ -118,7 +153,7 @@ export default function Home() {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-4 pb-32 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto p-4 pb-48 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
           <div className="max-w-3xl mx-auto space-y-4 pt-16 lg:pt-10">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4">
@@ -138,6 +173,24 @@ export default function Home() {
         </div>
 
         {/* Control Bar */}
+        {/* Text input placed above ControlBar */}
+        <div className="absolute bottom-35 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
+          <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-full p-2 flex items-center shadow-2xl">
+            <input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendText(); }}
+              placeholder={isConnected ? "Type a message..." : "Connect to send text"}
+              className="flex-1 bg-transparent outline-none text-white px-4 py-2 rounded-full"
+            />
+            <button
+              onClick={handleSendText}
+              className="ml-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium"
+            >
+              Send
+            </button>
+          </div>
+        </div>
         <ControlBar
           isConnected={isConnected}
           isRecording={isRecording}
