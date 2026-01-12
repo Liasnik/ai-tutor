@@ -118,7 +118,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-dvh font-sans overflow-hidden">
+    <main className="flex h-[100dvh] font-sans overflow-hidden">
       {/* Desktop Sidebar (hidden on mobile, visible on lg) */}
       <div className="hidden lg:block h-full">
         <Sidebar
@@ -145,7 +145,7 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col relative h-full">
         {/* Header / Top Bar */}
-        <div className="absolute top-4 left-4 z-10 lg:hidden">
+        <div className="fixed top-4 left-4 z-20 lg:hidden">
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="p-2 bg-zinc-100/10 dark:bg-zinc-900/80 backdrop-blur rounded-full border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-500 dark:hover:text-white"
@@ -178,8 +178,12 @@ export default function Home() {
             <input
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSendText(); }}
-              placeholder={isConnected ? "Type a message..." : "Connect to send text"}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSendText();
+              }}
+              placeholder={
+                isConnected ? "Type a message..." : "Connect to send text"
+              }
               className="flex-1 w-10 bg-transparent outline-none px-4 py-2 rounded-full"
             />
             <button

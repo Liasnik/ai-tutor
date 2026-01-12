@@ -9,6 +9,12 @@ export function useMicrophone() {
   const startRecording = useCallback(
     async (deviceId: string, onAudioData: (base64: string) => void) => {
       try {
+        if (!navigator.mediaDevices) {
+          throw new Error(
+            "Microphone access is not available. Please ensure you are using a secure connection (HTTPS or localhost)."
+          );
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             deviceId: deviceId ? { exact: deviceId } : undefined,
