@@ -118,7 +118,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex h-screen bg-black text-white font-sans overflow-hidden">
+    <main className="flex min-h-dvh font-sans overflow-hidden">
       {/* Desktop Sidebar (hidden on mobile, visible on lg) */}
       <div className="hidden lg:block h-full">
         <Sidebar
@@ -148,7 +148,7 @@ export default function Home() {
         <div className="absolute top-4 left-4 z-10 lg:hidden">
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 bg-zinc-900/80 backdrop-blur rounded-full border border-zinc-800 text-zinc-400 hover:text-white"
+            className="p-2 bg-zinc-100/10 dark:bg-zinc-900/80 backdrop-blur rounded-full border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-500 dark:hover:text-white"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -159,7 +159,7 @@ export default function Home() {
           <div className="max-w-3xl mx-auto space-y-4 pt-16 lg:pt-10">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-zinc-200/10 dark:bg-color-sidebar border border-color-sidebar flex items-center justify-center">
                   <span className="text-2xl">👋</span>
                 </div>
                 <p>Ready to start. Connect to begin.</p>
@@ -169,23 +169,22 @@ export default function Home() {
             {messages.map((msg: Message) => (
               <ChatMessage key={msg.id} text={msg.text} isUser={msg.isUser} />
             ))}
-
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        <div className="absolute bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
-          <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-full p-2 flex items-center shadow-2xl">
+        <div className="fixed bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
+          <div className="backdrop-blur-md bg-color-sidebar border border-color-sidebar rounded-full p-2 flex items-center shadow-2xl">
             <input
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSendText(); }}
               placeholder={isConnected ? "Type a message..." : "Connect to send text"}
-              className="flex-1 w-10 bg-transparent outline-none text-white px-4 py-2 rounded-full"
+              className="flex-1 w-10 bg-transparent outline-none px-4 py-2 rounded-full"
             />
             <button
               onClick={handleSendText}
-              className="ml-0 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium"
+              className="ml-0 px-4 py-2 rounded-full user-message hover:scale-105 transition-all text-white font-medium"
             >
               Send
             </button>

@@ -23,9 +23,7 @@ export function ChatMessage({
     >
       <div
         className={`max-w-[85%] rounded-2xl px-5 py-3 shadow-sm prose prose-invert prose-sm max-w-none wrap-break-word ${
-          isUser
-            ? "bg-blue-600 text-white rounded-br-none"
-            : "bg-zinc-800/80 text-zinc-100 rounded-bl-none border border-zinc-700/50 backdrop-blur-sm"
+          isUser ? "rounded-br-none user-message" : "rounded-bl-none backdrop-blur-sm bg-card text-card-foreground border-color-border"
         }`}
       >
         <ReactMarkdown
