@@ -125,6 +125,7 @@ export default function Home() {
           currentSessionId={currentSessionId}
           onSelectSession={loadSession}
           onNewChat={startNewSession}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
           isOpen={true}
         />
@@ -135,6 +136,7 @@ export default function Home() {
         currentSessionId={currentSessionId}
         onSelectSession={loadSession}
         onNewChat={startNewSession}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -172,20 +174,18 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Control Bar */}
-        {/* Text input placed above ControlBar */}
-        <div className="absolute bottom-35 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
+        <div className="absolute bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
           <div className="bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-full p-2 flex items-center shadow-2xl">
             <input
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSendText(); }}
               placeholder={isConnected ? "Type a message..." : "Connect to send text"}
-              className="flex-1 bg-transparent outline-none text-white px-4 py-2 rounded-full"
+              className="flex-1 w-10 bg-transparent outline-none text-white px-4 py-2 rounded-full"
             />
             <button
               onClick={handleSendText}
-              className="ml-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium"
+              className="ml-0 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium"
             >
               Send
             </button>
