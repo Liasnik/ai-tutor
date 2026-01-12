@@ -32,8 +32,44 @@ export default function Home() {
     startNewSession,
   } = useGemini();
 
-  // We pass sendAudio to useMicrophone directly, but need to handle valid session
-  const { isRecording, startRecording, stopRecording } = useMicrophone();
+  // Use a ref for isConnected to avoid stale closure in handleToggleMic
+  const isConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  const {
+    isRecording,
+    error: micError,
+    startRecording,
+    stopRecording,
+  } = useMicrophone();
+
+  // Show microphone error as an alert for visibility on mobile
+  useEffect(() => {
+    if (micError) {
+      alert(micError);
+    }
+  }, [micError]);
+
+  const handleToggleMic = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      (async () => {
+        if (!isConnectedRef.current) {
+          await connect();
+        }
+        // Use a small delay to ensure connection state is updated if needed,
+        // though isConnectedRef will be accurate after await connect()
+        startRecording("default", (base64) => {
+          if (isConnectedRef.current) {
+            sendAudio(base64);
+          }
+        });
+      })();
+    }
+  };
 
   const { apiKey } = useSettingsStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(() => !apiKey);
@@ -70,29 +106,6 @@ export default function Home() {
       hasAutoOpenedRef.current = false;
     }
   }, [apiKey]);
-
-  const handleToggleMic = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      // Note: In real production, we'd handle deviceId selection
-      //  startRecording("default", (base64) => {
-      //   if (isConnected) {
-      //     sendAudio(base64);
-      //   }
-      // If not connected, connect first so audio will be sent
-      (async () => {
-        if (!isConnected) {
-          await connect();
-        }
-        startRecording("default", (base64) => {
-          if (isConnected) {
-            sendAudio(base64);
-          }
-        });
-      })();
-    }
-  };
 
   const handleConnect = () => {
     connect();
