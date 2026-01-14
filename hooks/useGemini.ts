@@ -103,7 +103,7 @@ export function useGemini() {
   }, [isConnected]);
 
   const disconnect = useCallback(async (clearResumption = true) => {
-    isExplicitDisconnectRef.current = clearResumption;
+    isExplicitDisconnectRef.current = true;
 
     if (clearResumption) {
       resumptionTokenRef.current = null;
@@ -138,10 +138,9 @@ export function useGemini() {
     }
 
     // Block any auto-reconnect triggers while we are manually connecting
-    const previousExplicitState = isExplicitDisconnectRef.current;
-    isExplicitDisconnectRef.current = true;
+    // Note: disconnect(false) will set isExplicitDisconnectRef to true, which is what we want
+    // so the old session doesn't try to auto-reconnect.
     await disconnect(false);
-    isExplicitDisconnectRef.current = previousExplicitState;
 
     try {
       setStatus("Connecting...");
@@ -259,9 +258,9 @@ export function useGemini() {
           responseModalities: ["AUDIO"] as any,
           outputAudioTranscription: {},
           // Enable resumption from the start. If we have a token, use it as 'handle'.
-          sessionResumption: {
-            handle: resumptionTokenRef.current || undefined,
-          },
+          sessionResumption: resumptionTokenRef.current
+            ? { handle: resumptionTokenRef.current }
+            : undefined,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
