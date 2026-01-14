@@ -22,8 +22,10 @@ export function ChatMessage({
       className={`flex w-full mb-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`max-w-[85%] rounded-2xl px-5 py-3 shadow-sm prose prose-invert prose-sm max-w-none wrap-break-word ${
-          isUser ? "rounded-br-none user-message" : "rounded-bl-none backdrop-blur-sm bg-card text-card-foreground border-color-border"
+        className={`max-w-[90%] rounded-2xl px-5 py-3 shadow-sm prose prose-invert prose-sm wrap-break-word ${
+          isUser
+            ? "rounded-br-none user-message"
+            : "rounded-bl-none backdrop-blur-sm bg-card text-card-foreground border-color-border"
         }`}
       >
         <ReactMarkdown
@@ -41,7 +43,13 @@ export function ChatMessage({
             strong: ({ node, ...props }) => (
               <strong className="font-bold text-white" {...props} />
             ),
-            code: ({ node, inline, className, children, ...props }: CodeProps) => {
+            code: ({
+              node,
+              inline,
+              className,
+              children,
+              ...props
+            }: CodeProps) => {
               return inline ? (
                 <code
                   className="bg-black/30 px-1 py-0.5 rounded text-sm font-mono"

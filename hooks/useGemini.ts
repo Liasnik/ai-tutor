@@ -51,6 +51,14 @@ export function useGemini() {
   const clientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<GeminiSession | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectionAttemptsRef = useRef(0);
+  const isExplicitDisconnectRef = useRef(false);
+
+  // Session Resumption State
+  const resumptionTokenRef = useRef<string | null>(null);
+  const apiSessionIdRef = useRef<string | null>(null);
 
   // Initialize AudioPlayer
   useEffect(() => {
@@ -94,7 +102,23 @@ export function useGemini() {
     }
   }, [isConnected]);
 
-  const disconnect = useCallback(async () => {
+  const disconnect = useCallback(async (clearResumption = true) => {
+    isExplicitDisconnectRef.current = clearResumption;
+
+    if (clearResumption) {
+      resumptionTokenRef.current = null;
+      apiSessionIdRef.current = null;
+      reconnectionAttemptsRef.current = 0;
+    }
+
+    if (reconnectionTimeoutRef.current) {
+      clearTimeout(reconnectionTimeoutRef.current);
+    }
+
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+    }
+
     if (sessionRef.current) {
       try {
         sessionRef.current.close();
@@ -113,7 +137,11 @@ export function useGemini() {
       return;
     }
 
-    await disconnect();
+    // Block any auto-reconnect triggers while we are manually connecting
+    const previousExplicitState = isExplicitDisconnectRef.current;
+    isExplicitDisconnectRef.current = true;
+    await disconnect(false);
+    isExplicitDisconnectRef.current = previousExplicitState;
 
     try {
       setStatus("Connecting...");
@@ -135,10 +163,43 @@ export function useGemini() {
             console.log("Session opened");
             setStatus("Connected");
             setIsConnected(true);
-            setMessages([]);
+            reconnectionAttemptsRef.current = 0;
+            isExplicitDisconnectRef.current = false;
+
+            // Start Heartbeat
+            if (heartbeatIntervalRef.current)
+              clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = setInterval(() => {
+              if (sessionRef.current) {
+                // Sending an empty audio chunk as a "keep-alive" if no native ping is exposed
+                // Or a small text if allowed. Better to use simple empty input for real-time.
+                sessionRef.current.sendRealtimeInput({
+                  audio: {
+                    data: "AA==", // Tiny empty PCM chunk (1 byte of zero)
+                    mimeType: "audio/pcm;rate=16000",
+                  },
+                });
+              }
+            }, 30000);
           },
           onmessage: ((message: unknown) => {
-            const msg = message as GeminiMessage;
+            const msg = message as any;
+
+            // Handle Session Resumption Data (can be at root or serverContent)
+            const resumptionUpdate =
+              msg.sessionResumptionUpdate ||
+              msg.serverContent?.sessionResumptionUpdate;
+            if (resumptionUpdate) {
+              const newToken =
+                resumptionUpdate.resumptionToken ||
+                resumptionUpdate.newHandle ||
+                resumptionUpdate.handle;
+              if (newToken) {
+                resumptionTokenRef.current = newToken;
+                apiSessionIdRef.current = resumptionUpdate.sessionId;
+              }
+            }
+
             // Handle Audio Output
             if (msg.serverContent?.modelTurn?.parts) {
               for (const part of msg.serverContent.modelTurn.parts) {
@@ -187,6 +248,22 @@ export function useGemini() {
             console.log("Session closed", e);
             setStatus("Disconnected");
             setIsConnected(false);
+
+            if (heartbeatIntervalRef.current)
+              clearInterval(heartbeatIntervalRef.current);
+
+            // Auto-reconnect if not explicit
+            if (!isExplicitDisconnectRef.current) {
+              const delay = Math.min(
+                1000 * Math.pow(2, reconnectionAttemptsRef.current),
+                30000
+              );
+              console.log(`Attempting reconnect in ${delay}ms...`);
+              reconnectionAttemptsRef.current++;
+              reconnectionTimeoutRef.current = setTimeout(() => {
+                connect();
+              }, delay);
+            }
           },
           onerror: (e: GeminiError | Error) => {
             console.error("Session error", e);
@@ -196,13 +273,17 @@ export function useGemini() {
         config: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           responseModalities: ["AUDIO"] as any,
-          outputAudioTranscription: {}, // Enable text output
+          outputAudioTranscription: {},
+          // Enable resumption from the start. If we have a token, use it as 'handle'.
+          sessionResumption: {
+            handle: resumptionTokenRef.current || undefined,
+          },
           speechConfig: {
-            voiceConfig: { 
-              prebuiltVoiceConfig: { 
-                voiceName: selectedVoice
-               } 
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: selectedVoice,
               },
+            },
             languageCode: selectedLanguage,
           },
           systemInstruction: { parts: [{ text: systemPrompt }] },
