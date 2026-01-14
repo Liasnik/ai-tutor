@@ -68,6 +68,27 @@ export function useGemini() {
     };
   }, []);
 
+  // Ensure strict cleanup on unmount to prevent ghost connections (Double-invoke protection)
+  useEffect(() => {
+    return () => {
+      if (sessionRef.current) {
+        console.log("Cleanup: Unmounting, closing session");
+        // We use a "force" disconnect here that doesn't trigger auto-reconnect logic
+        isExplicitDisconnectRef.current = true;
+        if (reconnectionTimeoutRef.current)
+          clearTimeout(reconnectionTimeoutRef.current);
+        if (heartbeatIntervalRef.current)
+          clearInterval(heartbeatIntervalRef.current);
+        try {
+          sessionRef.current.close();
+        } catch (e) {
+          console.error("Error closing session on cleanup", e);
+        }
+        sessionRef.current = null;
+      }
+    };
+  }, []);
+
   // Helper to ensure session exists
   const ensureSession = useCallback(async () => {
     if (!currentSessionId) {
@@ -131,16 +152,39 @@ export function useGemini() {
     setStatus("Disconnected");
   }, []);
 
+  const scheduleReconnect = useCallback(() => {
+    if (
+      !isExplicitDisconnectRef.current &&
+      reconnectionAttemptsRef.current < 5
+    ) {
+      const delay = Math.min(
+        1000 * Math.pow(2, reconnectionAttemptsRef.current),
+        30000
+      );
+      console.log(`Connection failed/closed. Retrying in ${delay}ms...`);
+      reconnectionAttemptsRef.current++;
+      reconnectionTimeoutRef.current = setTimeout(() => {
+        connect();
+      }, delay);
+    }
+  }, []); // connect is hoisted or we need to be careful with dependency cycle, but inside component it's fine if connect is stable
+
   const connect = useCallback(async () => {
     if (!apiKey) {
       setStatus("Error: No API Key");
       return;
     }
 
-    // Block any auto-reconnect triggers while we are manually connecting
-    // Note: disconnect(false) will set isExplicitDisconnectRef to true, which is what we want
-    // so the old session doesn't try to auto-reconnect.
+    // disconnect(false) will set isExplicitDisconnectRef to true, so the old session doesn't try to auto-reconnect.
     await disconnect(false);
+
+    // Reset explicit disconnect flag so that if this new connection fails, it counts as an accidental drop and triggers auto-reconnect.
+    isExplicitDisconnectRef.current = false;
+
+    console.log(
+      "Connecting with resumption token:",
+      resumptionTokenRef.current
+    );
 
     try {
       setStatus("Connecting...");
@@ -215,6 +259,26 @@ export function useGemini() {
               });
             }
 
+            // Handle Output Transcription (The actual spoken text, filtering out thoughts)
+            if (msg.serverContent?.outputTranscription?.text) {
+              const text = msg.serverContent.outputTranscription.text;
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                // If previous message exists, is from AI, and is NOT complete -> append
+                if (last && !last.isUser && !last.isComplete) {
+                  return [
+                    ...prev.slice(0, -1),
+                    { ...last, text: last.text + text },
+                  ];
+                }
+                // Otherwise start a new AI message
+                return [
+                  ...prev,
+                  { id: Date.now().toString(), text: text, isUser: false },
+                ];
+              });
+            }
+
             // Handle Turn Complete
             if (msg.serverContent?.turnComplete) {
               setStatus("Listening...");
@@ -235,18 +299,11 @@ export function useGemini() {
             if (heartbeatIntervalRef.current)
               clearInterval(heartbeatIntervalRef.current);
 
+            if (heartbeatIntervalRef.current)
+              clearInterval(heartbeatIntervalRef.current);
+
             // Auto-reconnect if not explicit
-            if (!isExplicitDisconnectRef.current) {
-              const delay = Math.min(
-                1000 * Math.pow(2, reconnectionAttemptsRef.current),
-                30000
-              );
-              console.log(`Attempting reconnect in ${delay}ms...`);
-              reconnectionAttemptsRef.current++;
-              reconnectionTimeoutRef.current = setTimeout(() => {
-                connect();
-              }, delay);
-            }
+            scheduleReconnect();
           },
           onerror: (e: GeminiError | Error) => {
             console.error("Session error", e);
@@ -257,10 +314,10 @@ export function useGemini() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           responseModalities: ["AUDIO"] as any,
           outputAudioTranscription: {},
-          // Enable resumption from the start. If we have a token, use it as 'handle'.
-          sessionResumption: resumptionTokenRef.current
-            ? { handle: resumptionTokenRef.current }
-            : undefined,
+          // Enable resumption from the start. We must pass an object to enable the feature.
+          sessionResumption: {
+            handle: resumptionTokenRef.current || undefined,
+          },
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
@@ -281,6 +338,14 @@ export function useGemini() {
         error instanceof Error ? error.message : String(error);
       setStatus("Error: " + errorMessage);
       setIsConnected(false);
+
+      setIsConnected(false);
+
+      // Re-enable auto-reconnect for this failure path
+      isExplicitDisconnectRef.current = false;
+
+      // Retry on connection failure
+      scheduleReconnect();
     }
   }, [
     apiKey,
