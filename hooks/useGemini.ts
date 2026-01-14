@@ -165,22 +165,6 @@ export function useGemini() {
             setIsConnected(true);
             reconnectionAttemptsRef.current = 0;
             isExplicitDisconnectRef.current = false;
-
-            // Start Heartbeat
-            if (heartbeatIntervalRef.current)
-              clearInterval(heartbeatIntervalRef.current);
-            heartbeatIntervalRef.current = setInterval(() => {
-              if (sessionRef.current) {
-                // Sending an empty audio chunk as a "keep-alive" if no native ping is exposed
-                // Or a small text if allowed. Better to use simple empty input for real-time.
-                sessionRef.current.sendRealtimeInput({
-                  audio: {
-                    data: "AA==", // Tiny empty PCM chunk (1 byte of zero)
-                    mimeType: "audio/pcm;rate=16000",
-                  },
-                });
-              }
-            }, 30000);
           },
           onmessage: ((message: unknown) => {
             const msg = message as any;
