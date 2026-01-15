@@ -5,6 +5,8 @@ interface ChatSession {
   title: string;
   profile: string;
   timestamp: number;
+  resumptionToken?: string;
+  apiSessionId?: string;
 }
 
 interface ChatMessage {
@@ -66,9 +68,24 @@ export async function createSession(
   return session;
 }
 
+export async function updateSession(id: string, updates: Partial<ChatSession>) {
+  const db = await initDB();
+  const session = await db.get("sessions", id);
+  if (!session) return;
+
+  const updatedSession = { ...session, ...updates };
+  await db.put("sessions", updatedSession);
+  return updatedSession;
+}
+
 export async function getSessions() {
   const db = await initDB();
   return db.getAllFromIndex("sessions", "by-timestamp");
+}
+
+export async function getSession(sessionId: string) {
+  const db = await initDB();
+  return db.get("sessions", sessionId);
 }
 
 export async function saveMessage(message: ChatMessage) {
