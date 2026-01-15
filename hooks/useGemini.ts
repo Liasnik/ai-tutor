@@ -1,16 +1,26 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useSettingsStore } from "@/store/settings";
 import { getSystemPrompt } from "@/lib/prompts";
 import { AudioPlayer } from "@/lib/audioPlayer";
 import { GoogleGenAI } from "@google/genai";
-import { createSession, saveMessage, getSessionMessages } from "@/lib/db";
+import {
+  createSession,
+  saveMessage,
+  getSessionMessages,
+  updateSession,
+  getSession,
+} from "@/lib/db";
 
 // Types for Gemini Live API
-// Infer session type from the connect method return value
 type GeminiSession = Awaited<ReturnType<GoogleGenAI["live"]["connect"]>>;
 
-// Message type - using the actual type from library's callbacks
-// The library uses LiveServerMessage internally
+interface GeminiResumptionUpdate {
+  resumptionToken?: string;
+  newHandle?: string;
+  handle?: string;
+  sessionId?: string;
+}
+
 interface GeminiServerContent {
   modelTurn?: {
     parts?: Array<{
@@ -24,13 +34,24 @@ interface GeminiServerContent {
     text: string;
   };
   turnComplete?: boolean;
+  sessionResumptionUpdate?: GeminiResumptionUpdate;
 }
 
 interface GeminiMessage {
   serverContent?: GeminiServerContent;
+  sessionResumptionUpdate?: GeminiResumptionUpdate;
 }
 
 type GeminiError = { message: string } | Error;
+
+// Connection State Machine
+export type ConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "disconnecting"
+  | "reconnecting"
+  | "error";
 
 export function useGemini() {
   const {
@@ -41,12 +62,43 @@ export function useGemini() {
     googleSearchEnabled,
     customInstructions,
   } = useSettingsStore();
-  const [status, setStatus] = useState("Disconnected");
-  const [isConnected, setIsConnected] = useState(false);
+
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("idle");
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+
+  // Computed status for UI compatibility
+  const isConnected =
+    connectionState === "connected" || connectionState === "reconnecting";
+  const status = useMemo(() => {
+    switch (connectionState) {
+      case "idle":
+        return "Disconnected";
+      case "connecting":
+        return "Connecting...";
+      case "connected":
+        return "Listening...";
+      case "disconnecting":
+        return "Disconnecting...";
+      case "reconnecting":
+        return "Reconnecting...";
+      case "error":
+        return errorDetails ? `Error: ${errorDetails}` : "Error";
+      default:
+        return "Disconnected";
+    }
+  }, [connectionState, errorDetails]);
+
   const [messages, setMessages] = useState<
     { id: string; text: string; isUser: boolean; isComplete?: boolean }[]
   >([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const currentSessionIdRef = useRef<string | null>(null);
+
+  // Sync ref with state
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   const clientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<GeminiSession | null>(null);
@@ -54,6 +106,9 @@ export function useGemini() {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectionAttemptsRef = useRef(0);
+  const connectRef = useRef<() => Promise<void>>(async () => {});
+
+  // Distinguishes manual disconnects from accidental drops for auto-reconnect
   const isExplicitDisconnectRef = useRef(false);
 
   // Session Resumption State
@@ -68,17 +123,19 @@ export function useGemini() {
     };
   }, []);
 
-  // Ensure strict cleanup on unmount to prevent ghost connections (Double-invoke protection)
+  // Ensure strict cleanup on unmount to prevent ghost connections
   useEffect(() => {
     return () => {
+      // Force cleanup on unmount
       if (sessionRef.current) {
         console.log("Cleanup: Unmounting, closing session");
-        // We use a "force" disconnect here that doesn't trigger auto-reconnect logic
-        isExplicitDisconnectRef.current = true;
+        isExplicitDisconnectRef.current = true; // Prevent auto-reconnect
+
         if (reconnectionTimeoutRef.current)
           clearTimeout(reconnectionTimeoutRef.current);
         if (heartbeatIntervalRef.current)
           clearInterval(heartbeatIntervalRef.current);
+
         try {
           sessionRef.current.close();
         } catch (e) {
@@ -89,7 +146,7 @@ export function useGemini() {
     };
   }, []);
 
-  // Helper to ensure session exists
+  // Helper to ensure session exists in DB
   const ensureSession = useCallback(async () => {
     if (!currentSessionId) {
       const newId = Date.now().toString();
@@ -111,20 +168,29 @@ export function useGemini() {
     }));
     setMessages(uiMsgs);
     setCurrentSessionId(sessionId);
+
+    // Load resumption token if exists
+    const session = await getSession(sessionId);
+    if (session?.resumptionToken) {
+      console.log("Context restored from DB", session.resumptionToken);
+      resumptionTokenRef.current = session.resumptionToken;
+      apiSessionIdRef.current = session.apiSessionId || null;
+    } else {
+      resumptionTokenRef.current = null;
+      apiSessionIdRef.current = null;
+    }
   }, []);
 
   const startNewSession = useCallback(() => {
     setMessages([]);
     setCurrentSessionId(null);
-    if (isConnected) {
-      // Keep connection but reset context?
-      // Gemini Live is stateful. Ideally we should reconnect or send a "reset" signal if supported,
-      // but simply clearing UI and IDs starts a "new" logical chat for storage.
-    }
-  }, [isConnected]);
+    resumptionTokenRef.current = null; // Reset resumption token for new chat
+    apiSessionIdRef.current = null;
+  }, []);
 
   const disconnect = useCallback(async (clearResumption = true) => {
     isExplicitDisconnectRef.current = true;
+    setConnectionState("disconnecting");
 
     if (clearResumption) {
       resumptionTokenRef.current = null;
@@ -148,11 +214,11 @@ export function useGemini() {
       }
       sessionRef.current = null;
     }
-    setIsConnected(false);
-    setStatus("Disconnected");
+    setConnectionState("idle");
   }, []);
 
   const scheduleReconnect = useCallback(() => {
+    // Only reconnect if it wasn't an explicit disconnect and we haven't exceeded attempts
     if (
       !isExplicitDisconnectRef.current &&
       reconnectionAttemptsRef.current < 5
@@ -162,24 +228,56 @@ export function useGemini() {
         30000
       );
       console.log(`Connection failed/closed. Retrying in ${delay}ms...`);
+      setConnectionState("reconnecting");
       reconnectionAttemptsRef.current++;
+
       reconnectionTimeoutRef.current = setTimeout(() => {
-        connect();
+        if (connectRef.current) connectRef.current();
       }, delay);
+    } else {
+      setConnectionState("idle");
     }
-  }, []); // connect is hoisted or we need to be careful with dependency cycle, but inside component it's fine if connect is stable
+  }, []);
 
   const connect = useCallback(async () => {
     if (!apiKey) {
-      setStatus("Error: No API Key");
+      setConnectionState("error");
+      setErrorDetails("No API Key");
       return;
     }
 
-    // disconnect(false) will set isExplicitDisconnectRef to true, so the old session doesn't try to auto-reconnect.
-    await disconnect(false);
+    // Prepare for new connection
+    // Ensure any previous session is cleaned up but DON'T clear resumption if we want to resume
+    const previousExplicit = isExplicitDisconnectRef.current;
+    isExplicitDisconnectRef.current = true; // Block auto-reconnect during manual setup
+    await disconnect(false); // false = keep resumption token if it exists
+    isExplicitDisconnectRef.current = previousExplicit; // Restore intent
 
-    // Reset explicit disconnect flag so that if this new connection fails, it counts as an accidental drop and triggers auto-reconnect.
+    // Reset explicit disconnect for the new attempt
     isExplicitDisconnectRef.current = false;
+
+    // Restore info from DB if we are reconnecting to an existing session but lost the ref
+    const activeSessionId = currentSessionIdRef.current || currentSessionId;
+    if (activeSessionId && !resumptionTokenRef.current) {
+      try {
+        const sess = await getSession(activeSessionId);
+        if (sess?.resumptionToken) {
+          console.log(
+            "Restoring token from DB for manual reconnect:",
+            sess.resumptionToken
+          );
+          resumptionTokenRef.current = sess.resumptionToken;
+          apiSessionIdRef.current = sess.apiSessionId || null;
+        } else {
+          console.log(
+            "No resumption token found in DB for session",
+            activeSessionId
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to restore session token", err);
+      }
+    }
 
     console.log(
       "Connecting with resumption token:",
@@ -187,7 +285,9 @@ export function useGemini() {
     );
 
     try {
-      setStatus("Connecting...");
+      setConnectionState("connecting");
+      setErrorDetails(null);
+
       clientRef.current = new GoogleGenAI({
         apiKey: apiKey,
         httpOptions: { apiVersion: "v1alpha" },
@@ -204,15 +304,14 @@ export function useGemini() {
         callbacks: {
           onopen: () => {
             console.log("Session opened");
-            setStatus("Connected");
-            setIsConnected(true);
+            setConnectionState("connected");
             reconnectionAttemptsRef.current = 0;
             isExplicitDisconnectRef.current = false;
           },
           onmessage: ((message: unknown) => {
-            const msg = message as any;
+            const msg = message as GeminiMessage;
 
-            // Handle Session Resumption Data (can be at root or serverContent)
+            // Handle Session Resumption Data
             const resumptionUpdate =
               msg.sessionResumptionUpdate ||
               msg.serverContent?.sessionResumptionUpdate;
@@ -223,13 +322,23 @@ export function useGemini() {
                 resumptionUpdate.handle;
               if (newToken) {
                 resumptionTokenRef.current = newToken;
-                apiSessionIdRef.current = resumptionUpdate.sessionId;
+                apiSessionIdRef.current = resumptionUpdate.sessionId || null;
+                console.log("Received new resumption token:", newToken);
+
+                // Persist to DB using the ref to ensure we use current ID
+                if (currentSessionIdRef.current) {
+                  updateSession(currentSessionIdRef.current, {
+                    resumptionToken: newToken,
+                    apiSessionId: resumptionUpdate.sessionId,
+                  });
+                }
               }
             }
 
             // Handle Audio Output
-            if (msg.serverContent?.modelTurn?.parts) {
-              for (const part of msg.serverContent.modelTurn.parts) {
+            const parts = msg.serverContent?.modelTurn?.parts;
+            if (parts) {
+              for (const part of parts) {
                 if (
                   part.inlineData &&
                   part.inlineData.mimeType?.startsWith("audio/")
@@ -240,28 +349,8 @@ export function useGemini() {
             }
 
             // Handle Output Transcription (The actual spoken text, filtering out thoughts)
-            if (msg.serverContent?.outputTranscription?.text) {
-              const text = msg.serverContent.outputTranscription.text;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                // If previous message exists, is from AI, and is NOT complete -> append
-                if (last && !last.isUser && !last.isComplete) {
-                  return [
-                    ...prev.slice(0, -1),
-                    { ...last, text: last.text + text },
-                  ];
-                }
-                // Otherwise start a new AI message
-                return [
-                  ...prev,
-                  { id: Date.now().toString(), text: text, isUser: false },
-                ];
-              });
-            }
-
-            // Handle Output Transcription (The actual spoken text, filtering out thoughts)
-            if (msg.serverContent?.outputTranscription?.text) {
-              const text = msg.serverContent.outputTranscription.text;
+            const text = msg.serverContent?.outputTranscription?.text;
+            if (text) {
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 // If previous message exists, is from AI, and is NOT complete -> append
@@ -281,7 +370,6 @@ export function useGemini() {
 
             // Handle Turn Complete
             if (msg.serverContent?.turnComplete) {
-              setStatus("Listening...");
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
                 if (last && !last.isUser) {
@@ -293,28 +381,22 @@ export function useGemini() {
           }) as (message: unknown) => void,
           onclose: (e: CloseEvent | Event) => {
             console.log("Session closed", e);
-            setStatus("Disconnected");
-            setIsConnected(false);
-
+            // Don't set state to idle immediately, check for reconnect
             if (heartbeatIntervalRef.current)
               clearInterval(heartbeatIntervalRef.current);
 
-            if (heartbeatIntervalRef.current)
-              clearInterval(heartbeatIntervalRef.current);
-
-            // Auto-reconnect if not explicit
             scheduleReconnect();
           },
           onerror: (e: GeminiError | Error) => {
             console.error("Session error", e);
-            setStatus("Error: " + e.message);
+            setConnectionState("error");
+            setErrorDetails(e instanceof Error ? e.message : String(e));
           },
         },
         config: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           responseModalities: ["AUDIO"] as any,
           outputAudioTranscription: {},
-          // Enable resumption from the start. We must pass an object to enable the feature.
           sessionResumption: {
             handle: resumptionTokenRef.current || undefined,
           },
@@ -336,16 +418,17 @@ export function useGemini() {
       console.error("Connection failed:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      setStatus("Error: " + errorMessage);
-      setIsConnected(false);
 
-      setIsConnected(false);
+      setConnectionState("error");
+      setErrorDetails(errorMessage);
 
-      // Re-enable auto-reconnect for this failure path
-      isExplicitDisconnectRef.current = false;
-
-      // Retry on connection failure
-      scheduleReconnect();
+      // Retry logic handled by scheduleReconnect logic check
+      if (
+        !isExplicitDisconnectRef.current &&
+        reconnectionAttemptsRef.current < 5
+      ) {
+        scheduleReconnect();
+      }
     }
   }, [
     apiKey,
@@ -355,7 +438,13 @@ export function useGemini() {
     googleSearchEnabled,
     customInstructions,
     disconnect,
+    scheduleReconnect,
   ]);
+
+  // Keep connectRef synced
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Save messages to DB effect
   const savedMessageIds = useRef<Set<string>>(new Set());
@@ -395,7 +484,7 @@ export function useGemini() {
       await sessionRef.current.sendRealtimeInput({
         audio: {
           data: base64Data,
-          mimeType: "audio/pcm;rate=16000", // Browser recording rate
+          mimeType: "audio/pcm;rate=16000",
         },
       });
     } catch (e) {
