@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, MicOff, Power, Loader2 } from "lucide-react";
+import { Mic, MicOff, VolumeOff, Power, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function ControlBar({
@@ -26,7 +26,7 @@ export function ControlBar({
   const isConnecting = status === "Connecting...";
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
       <div className="flex justify-center mb-4"></div>
       <div className="backdrop-blur-md rounded-full p-2 flex items-center justify-between shadow-2xl bg-color-sidebar border border-color-sidebar">
         <div className="flex items-center space-x-2 pl-0 pr-1 w-40">
@@ -70,7 +70,7 @@ export function ControlBar({
               className={cn(
                 "p-3 rounded-full transition-all duration-300 shadow-lg hover:scale-110 border-2 cursor-pointer",
                 isRecording
-                  ? "bg-red-500/10 border-red-500 text-red-500 animate-pulse shadow-red-900/20"
+                  ? "bg-red-500/10 border-red-400 text-red-400 animate-pulse shadow-red-900/20"
                   : "status-disconnected bg-transparent  dark:hover:bg-slate-900! "
               )}
             >
@@ -99,10 +99,10 @@ export function ControlBar({
         </div>
         {isAiSpeaking && (
           <button
-            className="absolute bottom-3 left-26 z-0 bg-red-500 text-white px-4 py-2 rounded-full cursor-pointer hover:scale-105 transition-all animate-in fade-in zoom-in duration-300"
+            className="absolute bottom-3 left-15 z-0 border-1.5 border-red-400 text-red-400 px-4 py-2 rounded-full cursor-pointer hover:scale-105 transition-all animate-in fade-in zoom-in duration-300"
             onClick={interrupt}
           >
-            Mute AI
+            <VolumeOff />
           </button>
         )}
       </div>

@@ -116,6 +116,9 @@ export function useGemini() {
   const resumptionTokenRef = useRef<string | null>(null);
   const apiSessionIdRef = useRef<string | null>(null);
 
+  // Interrupt State Tracking
+  const isInterruptedRef = useRef(false);
+
   // Initialize AudioPlayer
   useEffect(() => {
     audioPlayerRef.current = new AudioPlayer();
@@ -207,6 +210,7 @@ export function useGemini() {
     isExplicitDisconnectRef.current = true;
     setConnectionState("disconnecting");
     setIsAiSpeaking(false);
+    isInterruptedRef.current = false;
 
     if (clearResumption) {
       resumptionTokenRef.current = null;
@@ -289,6 +293,7 @@ export function useGemini() {
     try {
       setConnectionState("connecting");
       setErrorDetails(null);
+      isInterruptedRef.current = false;
 
       clientRef.current = new GoogleGenAI({
         apiKey: apiKey,
@@ -337,7 +342,7 @@ export function useGemini() {
 
             // Handle Audio Output
             const parts = msg.serverContent?.modelTurn?.parts;
-            if (parts) {
+            if (parts && !isInterruptedRef.current) {
               for (const part of parts) {
                 if (
                   part.inlineData &&
@@ -351,7 +356,7 @@ export function useGemini() {
 
             // Handle Output Transcription (The actual spoken text, filtering out thoughts)
             const text = msg.serverContent?.outputTranscription?.text;
-            if (text) {
+            if (text && !isInterruptedRef.current) {
               setIsAiSpeaking(true);
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
@@ -372,6 +377,7 @@ export function useGemini() {
 
             // Handle Turn Complete
             if (msg.serverContent?.turnComplete) {
+              isInterruptedRef.current = false; // Turn finished, reset interrupt block
               setIsAiSpeaking(false);
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
@@ -508,8 +514,30 @@ export function useGemini() {
     });
   }, [messages, currentSessionId, ensureSession]);
 
+  const interrupt = useCallback(() => {
+    setIsAiSpeaking(false);
+    isInterruptedRef.current = true;
+    audioPlayerRef.current?.stop();
+    if (sessionRef.current) {
+      try {
+        const session = sessionRef.current as any;
+        // 1. Send explicit interrupt signal
+        session.sendRealtimeInput({ interrupt: true });
+
+        // 2. Force terminate turn by sending a dummy input
+        // This ensures the server sends a 'turnComplete' which will reset our interrupt block.
+        // We use a small string of spaces as suggested by the user.
+        session.sendRealtimeInput({ text: " ".repeat(512) });
+      } catch (e) {
+        console.error("Error sending interrupt:", e);
+      }
+    }
+  }, []);
+
   const sendAudio = useCallback(async (base64Data: string) => {
     if (!sessionRef.current) return;
+    // Note: We NO LONGER reset isInterruptedRef here.
+    // It will be reset by turnComplete from the server or by an explicit sendText.
     try {
       await sessionRef.current.sendRealtimeInput({
         audio: {
@@ -522,37 +550,29 @@ export function useGemini() {
     }
   }, []);
 
-  const sendText = useCallback(async (text: string) => {
-    if (!sessionRef.current) return;
+  const sendText = useCallback(
+    async (text: string) => {
+      if (!sessionRef.current) return;
 
-    interrupt();
-    // Create new user message
-    const newMessage = {
-      id: Date.now().toString(),
-      text,
-      isUser: true,
-      isComplete: true,
-    };
-    setMessages((prev) => [...prev, newMessage]);
+      interrupt();
+      isInterruptedRef.current = false; // Explicit send, reset block
+      // Create new user message
+      const newMessage = {
+        id: Date.now().toString(),
+        text,
+        isUser: true,
+        isComplete: true,
+      };
+      setMessages((prev) => [...prev, newMessage]);
 
-    try {
-      await sessionRef.current.sendRealtimeInput({ text });
-    } catch (e) {
-      console.error("Error sending text:", e);
-    }
-  }, []);
-
-  const interrupt = useCallback(() => {
-    setIsAiSpeaking(false);
-    audioPlayerRef.current?.stop();
-    if (sessionRef.current) {
       try {
-        (sessionRef.current as any).sendRealtimeInput({ interrupt: true });
+        await sessionRef.current.sendRealtimeInput({ text });
       } catch (e) {
-        console.error("Error sending interrupt:", e);
+        console.error("Error sending text:", e);
       }
-    }
-  }, []);
+    },
+    [interrupt]
+  );
 
   return {
     status,
