@@ -8,7 +8,11 @@ export function useMicrophone() {
   const streamRef = useRef<MediaStream | null>(null);
 
   const startRecording = useCallback(
-    async (deviceId: string, onAudioData: (base64: string) => void) => {
+    async (
+      deviceId: string,
+      onAudioData: (base64: string) => void,
+      onVoiceActivity?: () => void
+    ) => {
       setError(null);
       try {
         if (!navigator.mediaDevices) {
@@ -51,10 +55,29 @@ export function useMicrophone() {
         source.connect(processor);
         processor.connect(audioContext.destination);
 
+        let lastVoiceActivity = 0;
+        const VOICE_THRESHOLD = 0.05;
+        const COOLDOWN = 1000; // 1 second between interrupt triggers
+
         processor.onaudioprocess = (e) => {
           if (!audioContextRef.current) return;
 
           const inputData = e.inputBuffer.getChannelData(0);
+
+          // Voice Activity Detection (Simple RMS)
+          if (onVoiceActivity) {
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              sum += inputData[i] * inputData[i];
+            }
+            const rms = Math.sqrt(sum / inputData.length);
+            const now = Date.now();
+
+            if (rms > VOICE_THRESHOLD && now - lastVoiceActivity > COOLDOWN) {
+              lastVoiceActivity = now;
+              onVoiceActivity();
+            }
+          }
 
           // Convert Float32 to Int16 PCM
           const pcmData = new Int16Array(inputData.length);

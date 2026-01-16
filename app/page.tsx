@@ -34,11 +34,17 @@ export default function Home() {
     startNewSession,
   } = useGemini();
 
-  // Use a ref for isConnected to avoid stale closure in handleToggleMic
+  // Use refs for state that need to be accessed in callbacks to avoid stale closures
   const isConnectedRef = useRef(isConnected);
+  const isAiSpeakingRef = useRef(isAiSpeaking);
+
   useEffect(() => {
     isConnectedRef.current = isConnected;
   }, [isConnected]);
+
+  useEffect(() => {
+    isAiSpeakingRef.current = isAiSpeaking;
+  }, [isAiSpeaking]);
 
   const {
     isRecording,
@@ -62,13 +68,23 @@ export default function Home() {
         if (!isConnectedRef.current) {
           await connect();
         }
+        interrupt();
         // Use a small delay to ensure connection state is updated if needed,
         // though isConnectedRef will be accurate after await connect()
-        startRecording("default", (base64) => {
-          if (isConnectedRef.current) {
-            sendAudio(base64);
+        startRecording(
+          "default",
+          (base64) => {
+            if (isConnectedRef.current) {
+              sendAudio(base64);
+            }
+          },
+          () => {
+            if (isAiSpeakingRef.current) {
+              console.log("Voice activity detected, interrupting AI...");
+              interrupt();
+            }
           }
-        });
+        );
       })();
     }
   };
@@ -188,7 +204,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="fixed bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
+        <div className="absolute bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
           <div className="backdrop-blur-md bg-color-sidebar border border-color-sidebar rounded-full p-2 flex items-center shadow-2xl">
             <input
               value={inputText}
