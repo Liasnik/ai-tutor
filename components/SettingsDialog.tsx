@@ -21,6 +21,8 @@ export function SettingsDialog({
     setVoice,
     googleSearchEnabled,
     setGoogleSearchEnabled,
+    vadThreshold,
+    setVadThreshold,
   } = useSettingsStore();
 
   if (!isOpen) return null;
@@ -126,6 +128,26 @@ export function SettingsDialog({
               <option value="fr-FR">French</option>
               <option value="ru-RU">Russian</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
+              Microphone sensitivity
+            </label>
+            <select
+              className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:border-blue-500 rounded-md p-2.5 text-zinc-900 dark:text-white outline-none transition-all"
+              value={vadThreshold}
+              onChange={(e) => setVadThreshold(Number(e.target.value))}
+            >
+              <option value={0.01}>High (Very Sensitive)</option>
+              <option value={0.03}>Above Normal</option>
+              <option value={0.05}>Normal (Default)</option>
+              <option value={0.1}>Low (Less Sensitive)</option>
+              <option value={0.2}>Very Low</option>
+            </select>
+            <p className="text-xs text-zinc-500 mt-1">
+              Higher value makes it harder for noise to interrupt the AI.
+            </p>
           </div>
 
           <div className="pt-2">

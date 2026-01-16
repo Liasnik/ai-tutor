@@ -12,6 +12,7 @@ interface SettingsState {
   googleSearchEnabled: boolean;
   customInstructions: string;
   theme: "dark" | "light";
+  vadThreshold: number;
 
   // Actions
   setApiKey: (key: string) => void;
@@ -23,6 +24,7 @@ interface SettingsState {
   setGoogleSearchEnabled: (enabled: boolean) => void;
   setCustomInstructions: (instructions: string) => void;
   setTheme: (theme: "dark" | "light") => void;
+  setVadThreshold: (threshold: number) => void;
   toggleTheme: () => void;
   completeOnboarding: () => void;
 }
@@ -40,6 +42,7 @@ export const useSettingsStore = create<SettingsState>()(
       googleSearchEnabled: true,
       customInstructions: "",
       theme: "dark",
+      vadThreshold: 0.05,
 
       setApiKey: (apiKey) => set({ apiKey }),
       setProfile: (selectedProfile) => set({ selectedProfile }),
@@ -52,6 +55,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCustomInstructions: (customInstructions) =>
         set({ customInstructions }),
       setTheme: (theme) => set({ theme }),
+      setVadThreshold: (vadThreshold) => set({ vadThreshold }),
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),
       completeOnboarding: () => set({ isOnboardingCompleted: true }),

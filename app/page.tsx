@@ -83,13 +83,14 @@ export default function Home() {
               console.log("Voice activity detected, interrupting AI...");
               interrupt();
             }
-          }
+          },
+          vadThreshold
         );
       })();
     }
   };
 
-  const { apiKey } = useSettingsStore();
+  const { apiKey, vadThreshold } = useSettingsStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(() => !apiKey);
   const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] =
     useState(false);

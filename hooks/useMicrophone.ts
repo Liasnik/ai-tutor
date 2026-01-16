@@ -11,7 +11,8 @@ export function useMicrophone() {
     async (
       deviceId: string,
       onAudioData: (base64: string) => void,
-      onVoiceActivity?: () => void
+      onVoiceActivity?: () => void,
+      threshold: number = 0.05
     ) => {
       setError(null);
       try {
@@ -56,7 +57,6 @@ export function useMicrophone() {
         processor.connect(audioContext.destination);
 
         let lastVoiceActivity = 0;
-        const VOICE_THRESHOLD = 0.05;
         const COOLDOWN = 1000; // 1 second between interrupt triggers
 
         processor.onaudioprocess = (e) => {
@@ -73,7 +73,7 @@ export function useMicrophone() {
             const rms = Math.sqrt(sum / inputData.length);
             const now = Date.now();
 
-            if (rms > VOICE_THRESHOLD && now - lastVoiceActivity > COOLDOWN) {
+            if (rms > threshold && now - lastVoiceActivity > COOLDOWN) {
               lastVoiceActivity = now;
               onVoiceActivity();
             }
