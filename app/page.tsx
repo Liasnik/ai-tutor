@@ -22,11 +22,13 @@ export default function Home() {
   const {
     status,
     isConnected,
+    isAiSpeaking,
     messages,
     connect,
     disconnect,
     sendAudio,
     sendText,
+    interrupt,
     currentSessionId,
     loadSession,
     startNewSession,
@@ -210,6 +212,8 @@ export default function Home() {
         <ControlBar
           isConnected={isConnected}
           isRecording={isRecording}
+          isAiSpeaking={isAiSpeaking}
+          interrupt={interrupt}
           onConnect={handleConnect}
           onDisconnect={handleDisconnect}
           onToggleMic={handleToggleMic}
