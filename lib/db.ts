@@ -15,6 +15,7 @@ interface ChatMessage {
   text: string;
   isUser: boolean;
   timestamp: number;
+  isCollapsed?: boolean;
 }
 
 interface AiTutorDB extends DBSchema {
@@ -114,6 +115,39 @@ export async function deleteSession(sessionId: string) {
   let cursor = await index.openCursor(sessionId);
   while (cursor) {
     await cursor.delete();
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+}
+
+export async function updateMessageState(
+  messageId: string,
+  isCollapsed: boolean
+) {
+  const db = await initDB();
+  const message = await db.get("messages", messageId);
+  if (!message) return;
+
+  message.isCollapsed = isCollapsed;
+  await db.put("messages", message);
+  return message;
+}
+
+export async function bulkUpdateMessagesState(
+  sessionId: string,
+  isCollapsed: boolean
+) {
+  const db = await initDB();
+  const tx = db.transaction("messages", "readwrite");
+  const index = tx.objectStore("messages").index("by-session");
+  let cursor = await index.openCursor(sessionId);
+
+  while (cursor) {
+    const message = cursor.value;
+    if (!message.isUser) {
+      message.isCollapsed = isCollapsed;
+      await cursor.update(message);
+    }
     cursor = await cursor.continue();
   }
   await tx.done;

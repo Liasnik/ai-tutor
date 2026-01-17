@@ -91,7 +91,13 @@ export function useGemini() {
   }, [connectionState, errorDetails]);
 
   const [messages, setMessages] = useState<
-    { id: string; text: string; isUser: boolean; isComplete?: boolean }[]
+    {
+      id: string;
+      text: string;
+      isUser: boolean;
+      isComplete?: boolean;
+      isCollapsed?: boolean;
+    }[]
   >([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const currentSessionIdRef = useRef<string | null>(null);
@@ -100,6 +106,13 @@ export function useGemini() {
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
+
+  const [preferCollapsed, setPreferCollapsed] = useState(false);
+  const preferCollapsedRef = useRef(false);
+
+  useEffect(() => {
+    preferCollapsedRef.current = preferCollapsed;
+  }, [preferCollapsed]);
 
   const clientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<GeminiSession | null>(null);
@@ -168,6 +181,7 @@ export function useGemini() {
       text: m.text,
       isUser: m.isUser,
       isComplete: true, // Old messages are always complete
+      isCollapsed: m.isCollapsed,
     }));
     setMessages(uiMsgs);
     setCurrentSessionId(sessionId);
@@ -370,7 +384,12 @@ export function useGemini() {
                 // Otherwise start a new AI message
                 return [
                   ...prev,
-                  { id: Date.now().toString(), text: text, isUser: false },
+                  {
+                    id: Date.now().toString(),
+                    text: text,
+                    isUser: false,
+                    isCollapsed: preferCollapsedRef.current,
+                  },
                 ];
               });
             }
@@ -508,6 +527,7 @@ export function useGemini() {
             text: msg.text,
             isUser: msg.isUser,
             timestamp: Number(msg.id),
+            isCollapsed: msg.isCollapsed,
           });
         }
       }
@@ -574,6 +594,33 @@ export function useGemini() {
     [interrupt]
   );
 
+  const toggleMessageCollapse = useCallback(
+    async (id: string, isCollapsed: boolean) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, isCollapsed } : m))
+      );
+      // Persist to DB
+      const { updateMessageState } = await import("@/lib/db");
+      await updateMessageState(id, isCollapsed);
+    },
+    []
+  );
+
+  const toggleAllMessagesCollapse = useCallback(
+    async (isCollapsed: boolean) => {
+      setPreferCollapsed(isCollapsed);
+      setMessages((prev) =>
+        prev.map((m) => (m.isUser ? m : { ...m, isCollapsed }))
+      );
+      // Persist to DB
+      if (currentSessionId) {
+        const { bulkUpdateMessagesState } = await import("@/lib/db");
+        await bulkUpdateMessagesState(currentSessionId, isCollapsed);
+      }
+    },
+    [currentSessionId]
+  );
+
   return {
     status,
     isConnected,
@@ -587,5 +634,7 @@ export function useGemini() {
     currentSessionId,
     loadSession,
     startNewSession,
+    toggleMessageCollapse,
+    toggleAllMessagesCollapse,
   };
 }
