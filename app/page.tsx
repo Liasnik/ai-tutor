@@ -10,15 +10,27 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { Sidebar } from "@/components/Sidebar";
 import { useSettingsStore } from "@/store/settings";
 import { Menu } from "lucide-react";
+import { GlobalCollapseToggle } from "@/components/GlobalCollapseToggle";
+import { ChatInput } from "@/components/ChatInput";
 
 interface Message {
   id: string;
   text: string;
   isUser: boolean;
   isComplete?: boolean;
+  isCollapsed?: boolean;
 }
 
 export default function Home() {
+  const { apiKey, vadThreshold } = useSettingsStore();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(() => !apiKey);
+  const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] =
+    useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasAutoOpenedRef = useRef(false);
+  const pendingSendRef = useRef<string | null>(null);
+  const [inputText, setInputText] = useState("");
   const {
     status,
     isConnected,
@@ -32,6 +44,8 @@ export default function Home() {
     currentSessionId,
     loadSession,
     startNewSession,
+    toggleMessageCollapse,
+    toggleAllMessagesCollapse,
   } = useGemini();
 
   // Use refs for state that need to be accessed in callbacks to avoid stale closures
@@ -90,17 +104,6 @@ export default function Home() {
     }
   };
 
-  const { apiKey, vadThreshold } = useSettingsStore();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(() => !apiKey);
-  const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] =
-    useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasAutoOpenedRef = useRef(false);
-  const pendingSendRef = useRef<string | null>(null);
-  const [inputText, setInputText] = useState("");
-
-  // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -199,33 +202,30 @@ export default function Home() {
             )}
 
             {messages.map((msg: Message) => (
-              <ChatMessage key={msg.id} text={msg.text} isUser={msg.isUser} />
+              <ChatMessage
+                key={msg.id}
+                id={msg.id}
+                text={msg.text}
+                isUser={msg.isUser}
+                isCollapsed={msg.isCollapsed}
+                onToggleCollapse={toggleMessageCollapse}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        <div className="absolute bottom-26 left-1/2 -translate-x-1/2 w-full max-w-lg px-4">
-          <div className="backdrop-blur-md bg-color-sidebar border border-color-sidebar rounded-full p-2 flex items-center shadow-2xl">
-            <input
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSendText();
-              }}
-              placeholder={
-                isConnected ? "Type a message..." : "Connect to send text"
-              }
-              className="flex-1 w-10 bg-transparent outline-none px-4 py-2 rounded-full"
-            />
-            <button
-              onClick={handleSendText}
-              className="ml-0 px-4 py-2 rounded-full user-message hover:scale-105 transition-all text-white font-medium"
-            >
-              Send
-            </button>
-          </div>
-        </div>
+        <GlobalCollapseToggle
+          messages={messages}
+          onToggleAll={toggleAllMessagesCollapse}
+        />
+
+        <ChatInput
+          value={inputText}
+          onChange={setInputText}
+          onSend={handleSendText}
+          isConnected={isConnected}
+        />
         <ControlBar
           isConnected={isConnected}
           isRecording={isRecording}
@@ -238,13 +238,11 @@ export default function Home() {
           status={status}
         />
 
-        {/* Settings Modal */}
         <SettingsDialog
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
         />
 
-        {/* Custom Instructions Modal */}
         <CustomInstructionsDialog
           isOpen={isCustomInstructionsOpen}
           onClose={() => setIsCustomInstructionsOpen(false)}
