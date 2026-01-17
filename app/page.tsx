@@ -19,6 +19,7 @@ interface Message {
   isUser: boolean;
   isComplete?: boolean;
   isCollapsed?: boolean;
+  audio?: Blob;
 }
 
 export default function Home() {
@@ -208,6 +209,7 @@ export default function Home() {
                 text={msg.text}
                 isUser={msg.isUser}
                 isCollapsed={msg.isCollapsed}
+                audio={msg.audio}
                 onToggleCollapse={toggleMessageCollapse}
               />
             ))}

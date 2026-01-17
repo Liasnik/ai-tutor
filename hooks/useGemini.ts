@@ -3,6 +3,7 @@ import { useSettingsStore } from "@/store/settings";
 import { getSystemPrompt } from "@/lib/prompts";
 import { AudioPlayer } from "@/lib/audioPlayer";
 import { GoogleGenAI } from "@google/genai";
+import { base64ToInt16, encodePcmToMp3 } from "@/lib/audioEncoder";
 import {
   createSession,
   saveMessage,
@@ -97,6 +98,7 @@ export function useGemini() {
       isUser: boolean;
       isComplete?: boolean;
       isCollapsed?: boolean;
+      audio?: Blob;
     }[]
   >([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -128,6 +130,9 @@ export function useGemini() {
   // Session Resumption State
   const resumptionTokenRef = useRef<string | null>(null);
   const apiSessionIdRef = useRef<string | null>(null);
+
+  // Audio Accumulation
+  const currentAudioChunksRef = useRef<Int16Array[]>([]);
 
   // Interrupt State Tracking
   const isInterruptedRef = useRef(false);
@@ -182,6 +187,7 @@ export function useGemini() {
       isUser: m.isUser,
       isComplete: true, // Old messages are always complete
       isCollapsed: m.isCollapsed,
+      audio: m.audio,
     }));
     setMessages(uiMsgs);
     setCurrentSessionId(sessionId);
@@ -364,6 +370,16 @@ export function useGemini() {
                 ) {
                   setIsAiSpeaking(true);
                   audioPlayerRef.current?.play(part.inlineData.data);
+                  // Accumulate audio for persistence
+                  try {
+                    const chunk = base64ToInt16(part.inlineData.data);
+                    currentAudioChunksRef.current.push(chunk);
+                  } catch (err) {
+                    console.error(
+                      "[useGemini] Error decoding audio chunk:",
+                      err
+                    );
+                  }
                 }
               }
             }
@@ -382,10 +398,11 @@ export function useGemini() {
                   ];
                 }
                 // Otherwise start a new AI message
+                const newAiMessageId = Date.now().toString();
                 return [
                   ...prev,
                   {
-                    id: Date.now().toString(),
+                    id: newAiMessageId,
                     text: text,
                     isUser: false,
                     isCollapsed: preferCollapsedRef.current,
@@ -394,14 +411,28 @@ export function useGemini() {
               });
             }
 
-            // Handle Turn Complete
             if (msg.serverContent?.turnComplete) {
-              isInterruptedRef.current = false; // Turn finished, reset interrupt block
+              isInterruptedRef.current = false;
               setIsAiSpeaking(false);
+
+              // Calculate blob OUTSIDE the updater to avoid side-effect issues with React double-invoking updaters
+              let audioBlob: Blob | undefined = undefined;
+              if (currentAudioChunksRef.current.length > 0) {
+                try {
+                  audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
+                  currentAudioChunksRef.current = [];
+                } catch (err) {
+                  console.error("[useGemini] Encoding failed:", err);
+                }
+              }
+
               setMessages((prev) => {
                 const last = prev[prev.length - 1];
-                if (last && !last.isUser) {
-                  return [...prev.slice(0, -1), { ...last, isComplete: true }];
+                if (last && !last.isUser && !last.isComplete) {
+                  return [
+                    ...prev.slice(0, -1),
+                    { ...last, isComplete: true, audio: audioBlob },
+                  ];
                 }
                 return prev;
               });
@@ -528,6 +559,7 @@ export function useGemini() {
             isUser: msg.isUser,
             timestamp: Number(msg.id),
             isCollapsed: msg.isCollapsed,
+            audio: msg.audio,
           });
         }
       }
@@ -538,6 +570,27 @@ export function useGemini() {
     setIsAiSpeaking(false);
     isInterruptedRef.current = true;
     audioPlayerRef.current?.stop();
+
+    // Finalize audio for the current (interrupted) AI message if any
+    if (currentAudioChunksRef.current.length > 0) {
+      try {
+        const audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
+        currentAudioChunksRef.current = [];
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && !last.isUser && !last.isComplete) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, audio: audioBlob, isComplete: true },
+            ];
+          }
+          return prev;
+        });
+      } catch (e) {
+        console.error("Error finalizing partial audio on interrupt:", e);
+      }
+    }
+
     if (sessionRef.current) {
       try {
         const session = sessionRef.current as any;
