@@ -16,6 +16,7 @@ interface ChatMessage {
   isUser: boolean;
   timestamp: number;
   isCollapsed?: boolean;
+  audio?: Blob;
 }
 
 interface AiTutorDB extends DBSchema {
