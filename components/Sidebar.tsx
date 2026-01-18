@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { getSessions, deleteSession } from "@/lib/db";
-import { MessageSquare, Trash2, Plus, X, Settings, Settings2 } from "lucide-react";
+import {
+  MessageSquare,
+  Trash2,
+  Plus,
+  X,
+  Settings,
+  Settings2,
+  Database,
+} from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +27,7 @@ interface HistorySidebarProps {
   onNewChat: () => void;
   onOpenSettings: () => void;
   onCustomInstructionsClick: () => void;
+  onOpenDataManagement: () => void;
   isOpen?: boolean;
   onClose?: () => void; // For mobile
   isMobile?: boolean;
@@ -30,19 +39,19 @@ export function Sidebar({
   onNewChat,
   onOpenSettings,
   onCustomInstructionsClick,
+  onOpenDataManagement,
   isOpen = true,
   onClose,
   isMobile = false,
 }: HistorySidebarProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  
   const loadSessions = async () => {
     const list = await getSessions();
     // Sort by newest first
     setSessions(list.reverse());
   };
-  
+
   useEffect(() => {
     (async () => {
       await loadSessions();
@@ -130,8 +139,6 @@ export function Sidebar({
 
       {/* Custom AI Instructions button at bottom */}
       <div className="flex flex-col p-4 border-t gap-2 border-t-color-sidebar">
-      
-        
         <button
           onClick={() => {
             onCustomInstructionsClick();
@@ -153,8 +160,18 @@ export function Sidebar({
           <Settings className="w-4 h-4" />
           <span>Settings</span>
         </button>
-          {/* Theme toggle */}
-          <ThemeToggle />
+        {/* Theme toggle */}
+        <ThemeToggle />
+        <button
+          onClick={() => {
+            onOpenDataManagement();
+            if (isMobile && onClose) onClose();
+          }}
+          className="w-full flex items-center justify-start space-x-2 py-2 px-3 rounded-lg transition-colors text-color-sidebar-foreground hover:bg-[rgba(0,0,0,0.06)] dark:hover:bg-slate-900 cursor-pointer"
+        >
+          <Database className="w-4 h-4" />
+          <span>Data Management</span>
+        </button>
       </div>
     </div>
   );
