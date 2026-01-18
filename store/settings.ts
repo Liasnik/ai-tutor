@@ -13,6 +13,7 @@ interface SettingsState {
   customInstructions: string;
   theme: "dark" | "light";
   vadThreshold: number;
+  audioDeletionEnabled: boolean;
 
   // Actions
   setApiKey: (key: string) => void;
@@ -25,6 +26,7 @@ interface SettingsState {
   setCustomInstructions: (instructions: string) => void;
   setTheme: (theme: "dark" | "light") => void;
   setVadThreshold: (threshold: number) => void;
+  setAudioDeletionEnabled: (enabled: boolean) => void;
   toggleTheme: () => void;
   completeOnboarding: () => void;
 }
@@ -43,6 +45,7 @@ export const useSettingsStore = create<SettingsState>()(
       customInstructions: "",
       theme: "dark",
       vadThreshold: 0.05,
+      audioDeletionEnabled: false,
 
       setApiKey: (apiKey) => set({ apiKey }),
       setProfile: (selectedProfile) => set({ selectedProfile }),
@@ -56,6 +59,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ customInstructions }),
       setTheme: (theme) => set({ theme }),
       setVadThreshold: (vadThreshold) => set({ vadThreshold }),
+      setAudioDeletionEnabled: (audioDeletionEnabled) =>
+        set({ audioDeletionEnabled }),
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),
       completeOnboarding: () => set({ isOnboardingCompleted: true }),

@@ -26,7 +26,7 @@ export function GlobalCollapseToggle({
     <div className="fixed right-5 bottom-43 z-20">
       <button
         onClick={() => onToggleAll(hasExpanded)}
-        className="p-3 bg-color-sidebar border border-color-sidebar backdrop-blur-md rounded-full text-zinc-400 hover:text-white transition-all shadow-lg group"
+        className="p-3 bg-color-sidebar border border-color-sidebar backdrop-blur-md rounded-full text-zinc-400 hover:text-zinc-500 dark:hover:text-white transition-all shadow-lg group"
         title={hasExpanded ? "Collapse All" : "Expand All"}
       >
         {hasExpanded ? (

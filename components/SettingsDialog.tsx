@@ -123,6 +123,7 @@ export function SettingsDialog({
               onChange={(e) => setLanguage(e.target.value)}
             >
               <option value="en-US">English (US)</option>
+              <option value="uk-UA">Ukrainian</option>
               <option value="de-DE">German</option>
               <option value="es-ES">Spanish</option>
               <option value="fr-FR">French</option>
