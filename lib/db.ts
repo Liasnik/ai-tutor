@@ -153,3 +153,37 @@ export async function bulkUpdateMessagesState(
   }
   await tx.done;
 }
+
+export async function deleteMessageAudio(messageId: string) {
+  const db = await initDB();
+  const message = await db.get("messages", messageId);
+  if (!message) return;
+
+  delete message.audio;
+  await db.put("messages", message);
+}
+
+export async function getStorageStats() {
+  const db = await initDB();
+  const messages = await db.getAll("messages");
+
+  let audioSize = 0;
+  let textSize = 0;
+
+  for (const msg of messages) {
+    if (msg.audio) {
+      audioSize += msg.audio.size;
+    }
+    if (msg.text) {
+      // Approximate text size: 1 character = 2 bytes (UTF-16) or 1 byte (UTF-8)
+      // For estimate, we'll use a simple approximation.
+      textSize += new Blob([msg.text]).size;
+    }
+  }
+
+  return {
+    audioSize,
+    textSize,
+    totalSize: audioSize + textSize,
+  };
+}

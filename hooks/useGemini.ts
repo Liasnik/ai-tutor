@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useSettingsStore } from "@/store/settings";
 import { getSystemPrompt } from "@/lib/prompts";
 import { AudioPlayer } from "@/lib/audioPlayer";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import { base64ToInt16, encodePcmToMp3 } from "@/lib/audioEncoder";
 import {
   createSession,
@@ -471,8 +471,7 @@ export function useGemini() {
           },
         },
         config: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          responseModalities: ["AUDIO"] as any,
+          responseModalities: [Modality.AUDIO],
           outputAudioTranscription: {},
           sessionResumption: {
             handle: resumptionTokenRef.current || undefined,
@@ -674,6 +673,14 @@ export function useGemini() {
     [currentSessionId]
   );
 
+  const deleteAudio = useCallback(async (messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, audio: undefined } : m))
+    );
+    const { deleteMessageAudio } = await import("@/lib/db");
+    await deleteMessageAudio(messageId);
+  }, []);
+
   return {
     status,
     isConnected,
@@ -689,5 +696,6 @@ export function useGemini() {
     startNewSession,
     toggleMessageCollapse,
     toggleAllMessagesCollapse,
+    deleteAudio,
   };
 }

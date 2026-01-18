@@ -12,6 +12,7 @@ import { useSettingsStore } from "@/store/settings";
 import { Menu } from "lucide-react";
 import { GlobalCollapseToggle } from "@/components/GlobalCollapseToggle";
 import { ChatInput } from "@/components/ChatInput";
+import { DataManagementDialog } from "@/components/DataManagementDialog";
 
 interface Message {
   id: string;
@@ -28,6 +29,7 @@ export default function Home() {
   const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] =
     useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDataManagementOpen, setIsDataManagementOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasAutoOpenedRef = useRef(false);
   const pendingSendRef = useRef<string | null>(null);
@@ -47,6 +49,7 @@ export default function Home() {
     startNewSession,
     toggleMessageCollapse,
     toggleAllMessagesCollapse,
+    deleteAudio,
   } = useGemini();
 
   // Use refs for state that need to be accessed in callbacks to avoid stale closures
@@ -163,6 +166,7 @@ export default function Home() {
           onNewChat={startNewSession}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
+          onOpenDataManagement={() => setIsDataManagementOpen(true)}
           isOpen={true}
         />
       </div>
@@ -174,6 +178,7 @@ export default function Home() {
         onNewChat={startNewSession}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onCustomInstructionsClick={() => setIsCustomInstructionsOpen(true)}
+        onOpenDataManagement={() => setIsDataManagementOpen(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isMobile={true}
@@ -210,7 +215,10 @@ export default function Home() {
                 isUser={msg.isUser}
                 isCollapsed={msg.isCollapsed}
                 audio={msg.audio}
-                onToggleCollapse={toggleMessageCollapse}
+                onToggleCollapse={(isCollapsed: boolean) =>
+                  toggleMessageCollapse(msg.id, isCollapsed)
+                }
+                onDeleteAudio={() => deleteAudio(msg.id)}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -248,6 +256,10 @@ export default function Home() {
         <CustomInstructionsDialog
           isOpen={isCustomInstructionsOpen}
           onClose={() => setIsCustomInstructionsOpen(false)}
+        />
+        <DataManagementDialog
+          isOpen={isDataManagementOpen}
+          onClose={() => setIsDataManagementOpen(false)}
         />
       </div>
     </main>
