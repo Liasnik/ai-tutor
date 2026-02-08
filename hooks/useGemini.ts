@@ -15,6 +15,11 @@ import {
 // Types for Gemini Live API
 type GeminiSession = Awaited<ReturnType<GoogleGenAI["live"]["connect"]>>;
 
+/** Session with sendRealtimeInput accepting interrupt/text (SDK types may omit these). */
+interface LiveSessionWithRealtime extends GeminiSession {
+  sendRealtimeInput(input: { interrupt?: boolean; text?: string }): void | Promise<void>;
+}
+
 interface GeminiResumptionUpdate {
   resumptionToken?: string;
   newHandle?: string;
@@ -35,6 +40,7 @@ interface GeminiServerContent {
     text: string;
   };
   turnComplete?: boolean;
+  interrupted?: boolean;
   sessionResumptionUpdate?: GeminiResumptionUpdate;
 }
 
@@ -136,6 +142,42 @@ export function useGemini() {
 
   // Interrupt State Tracking
   const isInterruptedRef = useRef(false);
+
+  // Helper: finalize the current (streaming) AI message — encode accumulated audio and mark complete
+  const finalizeCurrentAiMessage = useCallback(async () => {
+    setIsAiSpeaking(false);
+    
+    // First, mark the message as complete WITHOUT audio yet
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && !last.isUser && !last.isComplete) {
+        return [...prev.slice(0, -1), { ...last, isComplete: true }];
+      }
+      return prev;
+    });
+
+    // Then, encode audio separately to ensure proper async handling
+    if (currentAudioChunksRef.current.length > 0) {
+      try {
+        const audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
+        currentAudioChunksRef.current = [];
+        
+        // Once audio is ready, update the message with it
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && !last.isUser) {
+            // Find by id to ensure we update the right message
+            return prev.map((m) => 
+              m.id === last.id ? { ...m, audio: audioBlob } : m
+            );
+          }
+          return prev;
+        });
+      } catch (err) {
+        console.error("[useGemini] Encoding failed:", err);
+      }
+    }
+  }, []);
 
   // Initialize AudioPlayer
   useEffect(() => {
@@ -412,35 +454,22 @@ export function useGemini() {
             }
 
             if (msg.serverContent?.turnComplete) {
+              // Server finished a model turn — clear interrupt flag and finalize the AI message
               isInterruptedRef.current = false;
-              setIsAiSpeaking(false);
+              finalizeCurrentAiMessage().catch(e => console.error("Error finalizing on turnComplete:", e));
+            }
 
-              // Calculate blob OUTSIDE the updater to avoid side-effect issues with React double-invoking updaters
-              let audioBlob: Blob | undefined = undefined;
-              if (currentAudioChunksRef.current.length > 0) {
-                try {
-                  audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
-                  currentAudioChunksRef.current = [];
-                } catch (err) {
-                  console.error("[useGemini] Encoding failed:", err);
-                }
-              }
-
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && !last.isUser && !last.isComplete) {
-                  return [
-                    ...prev.slice(0, -1),
-                    { ...last, isComplete: true, audio: audioBlob },
-                  ];
-                }
-                return prev;
-              });
+            // Handle explicit interruption from server (when user interrupts the model mid-turn)
+            if (msg.serverContent?.interrupted) {
+              console.log("[useGemini] Model interrupted");
+              isInterruptedRef.current = false; // Clear flag so we stop blocking messages
+              audioPlayerRef.current?.stop();
+              finalizeCurrentAiMessage().catch(e => console.error("Error finalizing on interrupt:", e));
             }
           }) as (message: unknown) => void,
           onclose: (e: CloseEvent | Event) => {
             const code = "code" in e ? e.code : "unknown";
-            const reason = "reason" in e ? (e as any).reason : "";
+            const reason = "reason" in e ? (e as CloseEvent).reason : "";
 
             if (heartbeatIntervalRef.current)
               clearInterval(heartbeatIntervalRef.current);
@@ -472,6 +501,7 @@ export function useGemini() {
         },
         config: {
           responseModalities: [Modality.AUDIO],
+          inputAudioTranscription: {},
           outputAudioTranscription: {},
           sessionResumption: {
             handle: resumptionTokenRef.current || undefined,
@@ -533,33 +563,38 @@ export function useGemini() {
 
   // Save messages to DB effect
   const savedMessageIds = useRef<Set<string>>(new Set());
+  const pendingSaveRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
-    // We only save completed AI messages or User messages
-    messages.forEach(async (msg) => {
-      if (
-        (msg.isUser || msg.isComplete) &&
-        !savedMessageIds.current.has(msg.id)
-      ) {
-        savedMessageIds.current.add(msg.id);
+    // Chain saves to prevent race conditions
+    pendingSaveRef.current = pendingSaveRef.current.then(async () => {
+      for (const msg of messages) {
+        if (
+          (msg.isUser || msg.isComplete) &&
+          !savedMessageIds.current.has(msg.id)
+        ) {
+          savedMessageIds.current.add(msg.id);
 
-        // Ensure session exists lazily
-        let sessionId = currentSessionId;
-        if (!sessionId) {
-          // Double check inside async
-          sessionId = await ensureSession();
-        }
+          // Ensure session exists lazily
+          let sessionId = currentSessionId;
+          if (!sessionId) {
+            sessionId = await ensureSession();
+          }
 
-        if (sessionId) {
-          await saveMessage({
-            id: msg.id,
-            sessionId,
-            text: msg.text,
-            isUser: msg.isUser,
-            timestamp: Number(msg.id),
-            isCollapsed: msg.isCollapsed,
-            audio: msg.audio,
-          });
+          if (sessionId) {
+            // Add a small delay to ensure audio blob is fully ready
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
+            await saveMessage({
+              id: msg.id,
+              sessionId,
+              text: msg.text,
+              isUser: msg.isUser,
+              timestamp: Number(msg.id),
+              isCollapsed: msg.isCollapsed,
+              audio: msg.audio,
+            });
+          }
         }
       }
     });
@@ -567,39 +602,12 @@ export function useGemini() {
 
   const interrupt = useCallback(() => {
     setIsAiSpeaking(false);
-    isInterruptedRef.current = true;
     audioPlayerRef.current?.stop();
-
-    // Finalize audio for the current (interrupted) AI message if any
-    if (currentAudioChunksRef.current.length > 0) {
-      try {
-        const audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
-        currentAudioChunksRef.current = [];
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && !last.isUser && !last.isComplete) {
-            return [
-              ...prev.slice(0, -1),
-              { ...last, audio: audioBlob, isComplete: true },
-            ];
-          }
-          return prev;
-        });
-      } catch (e) {
-        console.error("Error finalizing partial audio on interrupt:", e);
-      }
-    }
 
     if (sessionRef.current) {
       try {
-        const session = sessionRef.current as any;
-        // 1. Send explicit interrupt signal
+        const session = sessionRef.current as LiveSessionWithRealtime;
         session.sendRealtimeInput({ interrupt: true });
-
-        // 2. Force terminate turn by sending a dummy input
-        // This ensures the server sends a 'turnComplete' which will reset our interrupt block.
-        // We use a small string of spaces as suggested by the user.
-        session.sendRealtimeInput({ text: " ".repeat(512) });
       } catch (e) {
         console.error("Error sending interrupt:", e);
       }
@@ -626,9 +634,41 @@ export function useGemini() {
     async (text: string) => {
       if (!sessionRef.current) return;
 
-      interrupt();
-      isInterruptedRef.current = false; // Explicit send, reset block
-      // Create new user message
+      // 1. Stop any ongoing AI audio playback
+      audioPlayerRef.current?.stop();
+      
+      // 2. Check if there's an incomplete AI message that needs to be finalized BEFORE we add user message
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && !last.isUser && !last.isComplete) {
+          isInterruptedRef.current = true; // block in-flight tail chunks from previous reply
+          return [...prev.slice(0, -1), { ...last, isComplete: true }];
+        }
+        return prev;
+      });
+
+      // Finalize any accumulated audio AFTER marking message as complete
+      if (currentAudioChunksRef.current.length > 0) {
+        try {
+          const audioBlob = encodePcmToMp3(currentAudioChunksRef.current);
+          currentAudioChunksRef.current = [];
+          
+          // Attach audio to the last AI message
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && !last.isUser) {
+              return prev.map((m) => 
+                m.id === last.id ? { ...m, audio: audioBlob } : m
+              );
+            }
+            return prev;
+          });
+        } catch (err) {
+          console.error("[useGemini] Error encoding audio on sendText:", err);
+        }
+      }
+
+      // 3. Now create and add user message
       const newMessage = {
         id: Date.now().toString(),
         text,
@@ -637,13 +677,21 @@ export function useGemini() {
       };
       setMessages((prev) => [...prev, newMessage]);
 
+      // 4. Send interrupt and text to server
+      try {
+        const session = sessionRef.current as LiveSessionWithRealtime;
+        session.sendRealtimeInput({ interrupt: true });
+      } catch (e) {
+        console.error("Error sending interrupt:", e);
+      }
+
       try {
         await sessionRef.current.sendRealtimeInput({ text });
       } catch (e) {
         console.error("Error sending text:", e);
       }
     },
-    [interrupt]
+    []
   );
 
   const toggleMessageCollapse = useCallback(
